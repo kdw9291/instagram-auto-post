@@ -1,0 +1,7 @@
+{
+  "enabled": false,
+  "username": "YOUR_INSTAGRAM_USERNAME",
+  "user_id": "YOUR_INSTAGRAM_USER_ID",
+  "api_version": "v25.0",
+  "provider": "cloudinary"
+}

@@ -1,0 +1,103 @@
+{
+  "interval_hours": 6,
+  "sources": [
+    {
+      "id": "apma-guide",
+      "name": "APMA 관람 안내",
+      "category": "place",
+      "url": "https://apma.amorepacific.com/visit/guide.do",
+      "kind": "html"
+    },
+    {
+      "id": "apma-faq",
+      "name": "APMA 예약 FAQ",
+      "category": "place",
+      "url": "https://apma.amorepacific.com/visit/faq/faq.do",
+      "kind": "html"
+    },
+    {
+      "id": "apma-exhibition",
+      "name": "APMA 전시 상세",
+      "category": "place",
+      "url": "https://apma.amorepacific.com/contents/exhibition/4128332/view.do",
+      "kind": "html"
+    },
+    {
+      "id": "apgroup-exhibition",
+      "name": "아모레퍼시픽 전시 보도자료",
+      "category": "place",
+      "url": "https://www.apgroup.com/int/ko/news/2026-08-21-2.html",
+      "kind": "html"
+    },
+    {
+      "id": "lghnh-news",
+      "name": "LG생활건강 신제품 소식",
+      "category": "beauty",
+      "url": "https://www.lghnh.com/news/press/list.jsp",
+      "kind": "html"
+    },
+    {
+      "id": "hankyung-life",
+      "name": "한국경제 생활 RSS",
+      "category": "mixed",
+      "url": "https://www.hankyung.com/feed/life",
+      "kind": "rss"
+    },
+    {
+      "id": "hera-release",
+      "name": "헤라 출시 발표",
+      "category": "beauty",
+      "url": "https://stories.amorepacific.com/%EC%95%84%EB%AA%A8%EB%A0%88%ED%8D%BC%EC%8B%9C%ED%94%BD-%ED%97%A4%EB%9D%BC-%EC%84%A0%EB%AA%85%ED%95%9C-%EC%BB%AC%EB%9F%AC%EC%99%80-%ED%81%AC%EB%A6%AC%EC%8A%A4%ED%83%88-%EA%B4%91%EC%B1%84-%EB%8B%B4/",
+      "kind": "html"
+    },
+    {
+      "id": "hera-product",
+      "name": "헤라 공식 제품 안내",
+      "category": "beauty",
+      "url": "https://hera.com/product/%EC%84%BC%EC%8A%88%EC%96%BC-%EC%83%A4%EC%9D%B8-%ED%8B%B4%ED%8A%B8/232/category/60/display/1/",
+      "kind": "html"
+    },
+    {
+      "id": "hera-store",
+      "name": "아모레몰 헤라 제품",
+      "category": "beauty",
+      "url": "https://www.amoremall.com/kr/ko/product/detail?onlineProdSn=70922&onlineProdCode=111070002495",
+      "kind": "html"
+    },
+    {
+      "id": "bgf-bakery",
+      "name": "BGF BAKE405 출시 발표",
+      "category": "food",
+      "url": "https://origin.bgf.co.kr/bgflive/view/?id=2024&categoryId=1",
+      "kind": "html"
+    },
+    {
+      "id": "bgf-discovery",
+      "name": "BGF 새 보도자료 탐색",
+      "category": "food",
+      "url": "https://origin.bgf.co.kr/bgflive/detail/?category=pr",
+      "kind": "html"
+    },
+    {
+      "id": "apgroup-discovery",
+      "name": "아모레퍼시픽 새 뷰티·장소 소식",
+      "category": "mixed",
+      "url": "https://www.apgroup.com/int/ko/news/news.html",
+      "kind": "html"
+    },
+    {
+      "id": "hankyung-economy",
+      "name": "한국경제 경제 RSS",
+      "category": "mixed",
+      "url": "https://www.hankyung.com/feed/economy",
+      "kind": "rss"
+    },
+    {
+      "id": "seoul-culture",
+      "name": "서울시 문화 RSS",
+      "category": "place",
+      "url": "https://mediahub.seoul.go.kr/news/rss/06",
+      "kind": "rss"
+    }
+  ]
+}

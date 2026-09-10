@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>넘기다 작업실</title><link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script></head>
+<body>
+<a class="skip" href="#main">본문으로 이동</a>
+<header><a class="brand" href="/">넘기다<span>인스타그램 자동화 구축 · 작업실</span></a><span class="connection">Instagram 계정</span></header>
+<main id="main">
+<div class="heading"><div><p class="eyebrow">EDITORIAL STUDIO</p><h1>오늘의 발견을 만들어 보세요</h1><p class="muted">원하는 시간에 시작하고, 카드와 릴스를 확인한 뒤 게시하세요.</p></div><button id="produce">새 콘텐츠 만들기</button><button id="refresh" class="secondary">새로고침</button></div>
+<p class="notice" id="studio-progress" role="status">실행만으로 제작하거나 게시하지 않습니다. 새 콘텐츠 만들기로 시작하세요.</p>
+<div class="workspace">
+<section class="production" aria-labelledby="production-title"><div class="section-top"><h2 id="production-title">제작물</h2><span id="count"></span></div><div id="items"><p>제작물을 불러오고 있습니다.</p></div></section>
+<section id="detail" class="detail" aria-label="선택한 완성본"><p>제작물을 선택해 주세요.</p></section>
+<aside><section class="settings"><p class="eyebrow">AUTOMATION</p><h2>운영 설정</h2><form id="settings-form" hidden><label class="toggle-label" for="review">완성본 확인 요청 <input id="review" type="checkbox" role="switch" checked></label><p id="mode-help" class="muted"></p><button type="submit" class="secondary">변경 저장</button></form><form id="operations-form"><h3>새 제작 한도</h3><p class="muted">한국 시간 기준 · 0건이면 해당 분야 새 제작 정지</p><div id="operation-fields"></div><button type="submit" class="secondary">운영 한도 저장</button></form><p id="operation-summary" class="muted"></p><div id="operation-deferred"></div><dl><dt>다루는 분야</dt><dd>가볼 곳 · 뷰티 · 먹거리</dd><dt>수집 상태</dt><dd>새 콘텐츠 만들기를 누를 때 실행</dd><dt>실제 게시</dt><dd>선택한 형식의 게시 버튼으로 실행</dd><dt>이미지 제작</dt><dd>뉴스마다 실사 느낌 이미지 자동 생성</dd></dl></section><section class="log"><h2>처리 기록</h2><ol id="events"></ol></section></aside>
+</div><section class="collection-panel"><h2>인터넷 수집·근거 대조</h2><p class="muted">공식 페이지·RSS를 확인합니다. 발견한 소식과 원문 대조는 실제 발행 승인과 구분합니다.</p><div id="collection"></div></section><p id="status" role="status" aria-live="polite"></p>
+</main><footer>넘기다 · Instagram 계정 · PC에서 제작하고 확인한 완성본을 게시합니다.</footer>
+</body></html>
+
