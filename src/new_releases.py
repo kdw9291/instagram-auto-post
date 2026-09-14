@@ -18,6 +18,30 @@ SCENES=[
 ]
 
 
+def student_meal_lineup(article,published):
+    """Parse the two named products in the 2026 culinary-school release.
+
+    The third award entry is deliberately omitted because the article does not
+    name it or give an exact launch date.
+    """
+    text=normalize(article)
+    first=re.search(r"첫상품은이달(\d{1,2})일출시한‘([^‘’()]{2,40})\(([\d,]+)원\)’이다\.",text)
+    second=re.search(r"오는(\d{1,2})일에는2위수상작인‘([^‘’]{2,40})’을내놓는다\.",text)
+    if not first or not second:return None
+    if text.count(first.group(0))!=1 or text.count(second.group(0))!=1:
+        raise EvidenceError('학생 레시피 제품 일정이 여러 번 나타납니다.')
+    if '수상작1~3위의레시피를CU간편식으로개발해이달부터순차적으로출시한다.' not in text:
+        raise EvidenceError('학생 레시피 라인업의 출시 범위를 확인할 수 없습니다.')
+    products=[]
+    for day,name in ((first[1],first[2]),(second[1],second[2])):
+        launch=datetime(published.year,published.month,int(day),tzinfo=KST)
+        if not 0<=(launch-published).days+7<=67:raise EvidenceError('제품 출시일 범위 확인 필요')
+        products.append({'name':name.strip(),'launch':launch})
+    price=int(first[3].replace(',',''))
+    if not 0<price<100000:raise EvidenceError('첫 제품 가격 범위 확인 필요')
+    return products,price
+
+
 def make_release(root,key,at=None):
     at=at or datetime.now(timezone.utc)
     try:
@@ -35,6 +59,23 @@ def make_release(root,key,at=None):
         if any(w in title for w in ('맥주','소주','와인','주류','음주','담배','건강기능','치료','선물세트','생활소품')):
             raise EvidenceError('현재 자동 출시 편집 범위 밖')
         if 'CU' not in title or '출시' not in title:raise EvidenceError('CU 출시 발표 제목이 필요합니다.')
+        lineup=student_meal_lineup(article,published)
+        if lineup:
+            products,price=lineup;name=' · '.join(p['name'] for p in products);launch=None
+            scene='Fictional Korean convenience-store lunch boxes with rice and colorful side dishes on a clean table, natural daylight, no branded packaging or writing'
+            claims=[evidence(sources,key,'products',[p['name'] for p in products],'two-named-product-sentences'),evidence(sources,key,'announced_launch',[p['launch'].date().isoformat() for p in products],'same-product-date-sentences'),evidence(sources,key,'first_product_price',price,'first-product-parentheses'),evidence(sources,key,'publication',published.date().isoformat(),'article-header'),evidence(sources,key,'announcement','CU 간편식 순차 출시','lineup-launch-sentence')]
+            lines=[f"{p['launch']:%m/%d} · {p['name']}" for p in products]
+            c={'source_id':key,'category':'food','title':'학생 레시피로 만든\nCU 간편식 2종','subtitle':'한국조리과학고 수상작\nBGF 공식 발표 기준',
+               'intro_heading':'확인된 두 가지 일정','intro':'\n'.join(lines),
+               'facts':[{'label':'첫 제품 발표 가격','value':f'{price:,}원'},{'label':'판매 채널','value':'전국 CU · 매장별 취급 확인'},{'label':'추가 수상작','value':'제품명·정확한 날짜 미공개'}],
+               'cta':'출시 일정 저장\n입고·재고는 매장 확인','conditions':'발표 일정이며 실제 입고를 보장하지 않습니다.\n이름이 공개되지 않은 3위 제품은 제외했습니다.',
+               'caption':'한국조리과학고 학생 레시피로 만든 CU 간편식 소식입니다. BGF가 '+f'{published:%Y.%m.%d} 공개한 자료에서 확인했습니다.\n'+'\n'.join(lines)+f'\n첫 제품 발표 가격: {price:,}원. 이름과 정확한 날짜가 공개되지 않은 3위 제품은 제외했습니다. 매장별 취급·입고·재고를 확인하세요.',
+               'image_subject':scene+'. Editorial photograph inspired by a student recipe convenience store food announcement'}
+            c,receipt=finish(c,claims,sources,'bgf-student-lineup-v1')
+            c['valid_until']=min(moment(c['valid_until']),published+timedelta(days=7)).isoformat()
+            receipt['scope']='BGF 학생 레시피 기사에서 이름이 공개된 2개 제품·일정·첫 제품 가격 대조'
+            receipt['omitted_fields']=['3위 제품: 이름과 정확한 출시일 미공개']
+            return c,receipt
         scheduled=list(re.finditer(r"(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*출시하는\s*‘([^‘’]{2,60}?)\(\s*([\d,]+)\s*원\s*\)\s*’",' '.join(article.split())))
         launch=None;price=None
         if scheduled:

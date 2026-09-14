@@ -147,13 +147,19 @@ def verify_content(root,content):
 
 def editorial_adapters(root=None):
     from .products import make_hera, make_bakery
+    from .seoul_events import make_drone
     from .new_releases import adapters
     from .apgroup_releases import adapters as ap_adapters
+    from .shinsegae_releases import adapters as shinsegae_adapters
+    from .seoul_weekly import make_weekly
     fixed=[('apma-auto-4128332',make_apma),('hera-auto-70922',make_hera),('bgf-auto-2024',make_bakery)]
-    dynamic=adapters(root)+ap_adapters(root) if root is not None else []
+    dynamic=adapters(root)+ap_adapters(root)+shinsegae_adapters(root) if root is not None else []
     if root is not None:
         try:
             report=json.loads((Path(root)/'data/runtime/collection/report.json').read_text(encoding='utf-8'))
+            if any(s.get('adapter')=='seoul-event' for s in report['sources']):dynamic.append(('seoul-drone-20260912',make_drone))
+            weekly={'seoul-calendar-202609','seoul-safety-202609','seoul-market-202609','seoul-phil-202609'}
+            if weekly.issubset({s.get('id') for s in report['sources']}):dynamic.append(('seoul-weekly-20260914',make_weekly))
             dates={s['id']:moment(s['published']).timestamp() for s in report['sources'] if s.get('published')}
             dynamic.sort(key=lambda pair:(-dates.get(pair[0],0),pair[0]))
         except (OSError,ValueError,KeyError):pass

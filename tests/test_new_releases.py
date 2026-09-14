@@ -67,6 +67,19 @@ class NewReleaseTests(unittest.TestCase):
         self.sentence+=' '+self.sentence;self.collect(True)
         with self.assertRaises(EvidenceError):make_release(self.root,'bgf-news-9999')
 
+    def test_student_recipe_article_keeps_only_two_named_products(self):
+        self.title='CU, 한국조리과학고 학생들의 레시피로 만든 간편식 출시!'
+        self.sentence=('수상작 1~3위의 레시피를 CU 간편식으로 개발해 이달부터 순차적으로 출시한다. '
+          '학생들의 레시피가 구현된 첫 상품은 이달 10일 출시한 ‘크카당맛있당정식 (5,700 원)’이다. '
+          '오는 22일에는 2위 수상작인 ‘마제소밥 & 함박정식’을 내놓는다. '
+          '3위 수상작 역시 상품 개발을 거쳐 다음달 선보일 예정이다.')
+        self.collect();c,r=make_release(self.root,'bgf-news-9999')
+        self.assertIn('간편식 2종',c['title']);self.assertIn('5,700원',c['caption'])
+        self.assertIn('3위 제품은 제외',c['caption']);self.assertEqual(len(r['claims']),5)
+        self.sentence=self.sentence.replace('오는 22일에는','오는 22일 무렵에는')
+        self.collect(True)
+        with self.assertRaises(EvidenceError):make_release(self.root,'bgf-news-9999')
+
     def test_paused_category_defers_before_image_creation(self):
         from src.operations import update,DEFAULT
         self.collect();store=Store(self.root)

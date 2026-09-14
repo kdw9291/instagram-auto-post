@@ -19,7 +19,7 @@ def sync(root,report,at=None):
     path=Path(root)/'data/runtime/discovery.sqlite3';path.parent.mkdir(parents=True,exist_ok=True)
     db=sqlite3.connect(path);db.row_factory=sqlite3.Row
     registered={canonical(s['url']) for s in report.get('sources',[]) if s['id'] in ('apgroup-exhibition','hera-release','bgf-bakery')}
-    checking={canonical(s['url']) for s in report.get('sources',[]) if s.get('adapter') in ('bgf-release','apgroup-release')}
+    checking={canonical(s['url']) for s in report.get('sources',[]) if s.get('adapter') in ('bgf-release','apgroup-release','shinsegae-release','seoul-event','seoul-weekly')}
     try:
         with db:
             db.execute('CREATE TABLE IF NOT EXISTS candidates(id TEXT PRIMARY KEY,url TEXT,title TEXT,category TEXT,published TEXT,expires TEXT,state TEXT,source_id TEXT)')

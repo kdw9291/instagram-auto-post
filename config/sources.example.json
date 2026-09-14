@@ -98,6 +98,86 @@
       "category": "place",
       "url": "https://mediahub.seoul.go.kr/news/rss/06",
       "kind": "rss"
+    },
+    {
+      "id": "amore-stories-rss",
+      "name": "아모레퍼시픽 스토리 공식 RSS",
+      "url": "https://stories.amorepacific.com/feed/",
+      "kind": "rss"
+    },
+        {
+            "id": "ssg-news-dd28c16b27ee7866",
+            "name": "딥티크 성수 팝업 공식 원문",
+            "url": "https://www.shinsegaegroupnewsroom.com/diptyque-les-rituels-de-soin-seongsu-popup/",
+            "kind": "html",
+            "category": "place",
+            "adapter": "shinsegae-release",
+            "headline": "딥티크, 고대 로마 목욕 문화에서 영감받은 웰빙 바디 컬렉션 출시 및 성수 팝업스토어 운영",
+            "published": "2026-09-10T00:00:00+09:00"
+        },
+        {
+            "id": "ssg-news-34fbf95f0682bb03",
+            "name": "스타벅스 가을 신메뉴 공식 원문",
+            "url": "https://www.shinsegaegroupnewsroom.com/autumn-starbucks-launch-sweetpotato/",
+            "kind": "html",
+            "category": "food",
+            "adapter": "shinsegae-release",
+            "headline": "고구마, 밤으로 가을 제철 코어 듬뿍… 스타벅스, ‘카스텔라 고구마 라떼’ 출시",
+            "published": "2026-09-11T00:00:00+09:00"
+        },
+        {
+            "id": "shinsegae-rss",
+      "name": "신세계그룹 공식 뉴스룸 RSS",
+      "url": "https://www.shinsegaegroupnewsroom.com/feed/",
+      "kind": "rss"
+    },
+    {
+      "id": "seoul-culture-rss",
+      "name": "서울시 문화본부 공식 RSS",
+      "url": "https://news.seoul.go.kr/culture/feed",
+      "kind": "rss"
+    },
+    {
+      "id": "seoul-event-534345",
+      "name": "서울시 드론쇼 공식 원문",
+      "url": "https://news.seoul.go.kr/culture/archives/534345",
+      "kind": "html",
+      "adapter": "seoul-event"
+    },
+    {
+      "id": "seoul-event-534306",
+      "name": "서울시 드론쇼 공식 원문",
+      "url": "https://news.seoul.go.kr/culture/archives/534306",
+      "kind": "html",
+      "adapter": "seoul-event"
+    },
+    {
+      "id": "seoul-calendar-202609",
+      "name": "서울시 9월 문화달력",
+      "url": "https://news.seoul.go.kr/culture/archives/534130",
+      "kind": "html",
+      "adapter": "seoul-weekly"
+    },
+    {
+      "id": "seoul-safety-202609",
+      "name": "서울안전한마당 공식 안내",
+      "url": "https://news.seoul.go.kr/safe/archives/518514?listPage=1",
+      "kind": "html",
+      "adapter": "seoul-weekly"
+    },
+    {
+      "id": "seoul-market-202609",
+      "name": "추석맞이 서로장터 공식 안내",
+      "url": "https://news.seoul.go.kr/gov/archives/580737",
+      "kind": "html",
+      "adapter": "seoul-weekly"
+    },
+    {
+      "id": "seoul-phil-202609",
+      "name": "서울시향 파크 콘서트 공식 안내",
+      "url": "https://www.seoulphil.or.kr/perf/view?flag=list&langCd=ko&menuFlag=MFLG0001&perfNo=7597",
+      "kind": "html",
+      "adapter": "seoul-weekly"
     }
   ]
 }
