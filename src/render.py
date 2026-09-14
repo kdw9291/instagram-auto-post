@@ -5,7 +5,7 @@ import hashlib
 from PIL import Image, ImageDraw, ImageFont
 from .backgrounds import background, topic_for, GENERATED_LABELS, ASSET_DIR
 
-RENDER_VERSION = 'editorial-background-v10-generated-ending'
+RENDER_VERSION = 'editorial-background-v11-provided'
 
 def visual_revision():
     """Asset changes must invalidate approvals even if the manuscript is identical."""
@@ -86,6 +86,10 @@ def render_cards(content, directory, root=None):
                 text(d,'다음 소식도 함께해요',(64,480),64,PAPER,True)
                 text(d,'프로필에서 팔로우해 주세요',(64,640),42,PAPER)
                 text(d,'AI 연출 이미지 포함 · 실제 제품·현장 사진 아님',(64,1240),25,PAPER)
+            if content.get('news_image',{}).get('kind')=='provided':
+                d=ImageDraw.Draw(im);d.rectangle((0,1210,1080,1350),fill=INK)
+                text(d,'본문 사진: 제공 자료 · 제공처와 이용 조건은 캡션 참조',(52,1230),26,PAPER,max_lines=2)
+                text(d,'마지막 브랜드 카드: AI 제작 이미지',(52,1290),25,PAPER,max_lines=1)
             path=directory/'card-4.png';im.save(path);paths.append(path);continue
         if index >= 1:
             # Reserve the bottom 20% for type; keep the photograph unobstructed.

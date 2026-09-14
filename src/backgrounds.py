@@ -8,6 +8,7 @@ ASSET_DIR=Path(__file__).resolve().parents[1]/'assets/images/backgrounds-v4'
 GENERATED_LABELS={'exhibition':'AI 공간 콘셉트 · 실제 현장·작품 아님','lip':'AI 뷰티 콘셉트 · 실제 제품·발색 아님','bakery':'AI 제빵 콘셉트 · 실제 제품 아님'}
 
 def background_label(content):
+    if content.get('news_image',{}).get('kind')=='provided':return '사진 제공: '+content['news_image']['credit']
     if content.get('news_image'):return 'AI 뉴스 연출 이미지 · 실제 제품·현장 아님'
     topic=topic_for(content)
     return GENERATED_LABELS.get(topic,TOPICS[topic][0])

@@ -45,6 +45,12 @@ def rows(root):
     finally:db.close()
 
 def attach(root,content,enqueue=False):
+    if not content.get('sample'):
+        from .provided_images import select,attach_provided
+        asset=select(root,content,acquire=enqueue)
+        if asset:
+            provided=attach_provided(content,asset)
+            if provided:return provided
     if not settings(root).get('required') or content.get('sample'):return content
     key,prompt=brief(content,settings(root));db=connect(root)
     try:
