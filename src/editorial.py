@@ -152,8 +152,9 @@ def editorial_adapters(root=None):
     from .apgroup_releases import adapters as ap_adapters
     from .shinsegae_releases import adapters as shinsegae_adapters
     from .seoul_weekly import make_weekly
+    from .seoul_releases import adapters as seoul_release_adapters
     fixed=[('apma-auto-4128332',make_apma),('hera-auto-70922',make_hera),('bgf-auto-2024',make_bakery)]
-    dynamic=adapters(root)+ap_adapters(root)+shinsegae_adapters(root) if root is not None else []
+    dynamic=adapters(root)+ap_adapters(root)+shinsegae_adapters(root)+seoul_release_adapters(root) if root is not None else []
     if root is not None:
         try:
             report=json.loads((Path(root)/'data/runtime/collection/report.json').read_text(encoding='utf-8'))

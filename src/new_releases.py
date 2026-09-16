@@ -42,6 +42,22 @@ def student_meal_lineup(article,published):
     return products,price
 
 
+def rescene_bakery_lineup(article,published):
+    """Parse the five named breads and one shared sequential launch date."""
+    text=normalize(article)
+    expected=['원이의옥수수크림빵','미나미의메론빵','메이의시나몬롤','제나의딸기샌드','리브의초코호떡']
+    if '5종을이달' not in text or not any(name in text for name in expected):return None
+    launch_match=re.search(r'5종을이달(\d{1,2})일부터순차적으로선보인다\.',text)
+    if not launch_match or text.count(launch_match.group(0))!=1:
+        raise EvidenceError('리센느 베이커리 출시 시작일을 확인할 수 없습니다.')
+    for name in expected:
+        if len(re.findall(r'‘(?:BAKE405)?'+re.escape(name)+r'’',text))!=1:
+            raise EvidenceError('리센느 베이커리 제품명이 모호합니다.')
+    launch=datetime(published.year,published.month,int(launch_match[1]),tzinfo=KST)
+    if not 0<=(launch-published).days<=31:raise EvidenceError('리센느 베이커리 출시일 범위 확인 필요')
+    return [re.sub(r'(원이|미나미|메이|제나|리브)의',r'\1 ',name) for name in expected],launch
+
+
 def make_release(root,key,at=None):
     at=at or datetime.now(timezone.utc)
     try:
@@ -75,6 +91,22 @@ def make_release(root,key,at=None):
             c['valid_until']=min(moment(c['valid_until']),published+timedelta(days=7)).isoformat()
             receipt['scope']='BGF 학생 레시피 기사에서 이름이 공개된 2개 제품·일정·첫 제품 가격 대조'
             receipt['omitted_fields']=['3위 제품: 이름과 정확한 출시일 미공개']
+            return c,receipt
+        bakery=rescene_bakery_lineup(article,published)
+        if bakery:
+            products,launch=bakery
+            claims=[evidence(sources,key,'products',products,'five-named-product-paragraphs'),evidence(sources,key,'announced_launch',launch.date().isoformat(),'sequential-launch-sentence'),evidence(sources,key,'publication',published.date().isoformat(),'article-header'),evidence(sources,key,'announcement','CU BAKE405 베이커리 5종 순차 출시','lineup-launch-sentence')]
+            lines=['원이 · 옥수수 크림빵','미나미 · 메론빵','메이 · 시나몬 롤','제나 · 딸기 샌드','리브 · 초코 호떡']
+            c={'source_id':key,'category':'food','title':'CU 신상 빵 5종\n리센느 취향을 담다','subtitle':f'{launch:%m/%d}부터 순차 출시 발표\nBGF 공식 자료 기준',
+               'intro_heading':'멤버별 다섯 가지 맛','intro':'\n'.join(lines[:3])+'\n외 2종',
+               'facts':[{'label':'출시 시작 발표','value':f'{launch:%Y.%m.%d}부터 순차 출시'},{'label':'제품 구성','value':'옥수수·메론·시나몬·딸기·초코'},{'label':'판매 채널','value':'CU · 매장별 취급·입고 확인'}],
+               'cta':'다섯 가지 취향 저장\n재고는 매장 확인','conditions':'가격은 공식 기사에 명시되지 않았습니다.\n발표 일정이며 매장별 입고는 다를 수 있습니다.',
+               'caption':'CU BAKE405 리센느 컬래버 베이커리 5종 소식입니다. BGF가 '+f'{published:%Y.%m.%d} 공개한 자료에서 {launch:%Y.%m.%d}부터 순차 출시한다고 발표했습니다.\n'+'\n'.join(lines)+'\n가격은 기사에 명시되지 않았습니다. 실제 출시·취급·입고·재고는 매장에서 확인하세요.',
+               'image_subject':'A realistic editorial bakery still life with five fictional pastries inspired by corn cream bread, melon bread, cinnamon roll, strawberry cream sandwich and chocolate hotteok, warm cafe daylight, no branded packaging, people or readable text'}
+            c,receipt=finish(c,claims,sources,'bgf-rescene-bakery-v1')
+            c['valid_until']=min(moment(c['valid_until']),published+timedelta(days=7)).isoformat()
+            receipt['scope']='BGF 리센느 베이커리 기사에서 5개 제품명과 순차 출시 시작일 대조'
+            receipt['omitted_fields']=['가격: 공식 기사에 명시되지 않음','포토카드: 먹거리 정보 중심 편집에서 제외']
             return c,receipt
         scheduled=list(re.finditer(r"(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*출시하는\s*‘([^‘’]{2,60}?)\(\s*([\d,]+)\s*원\s*\)\s*’",' '.join(article.split())))
         launch=None;price=None

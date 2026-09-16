@@ -80,6 +80,19 @@ class NewReleaseTests(unittest.TestCase):
         self.collect(True)
         with self.assertRaises(EvidenceError):make_release(self.root,'bgf-news-9999')
 
+    def test_rescene_bakery_article_keeps_five_named_products(self):
+        self.title='리센느 취향 담았다! CU, BAKE405 리센느 빵 5종 출시'
+        self.sentence=('CU는 브랜드 모델 리센느와 협업해 BAKE405 차별화 베이커리 5종을 이달 17일부터 순차적으로 선보인다. '
+          '‘BAKE405 원이의 옥수수 크림빵’은 옥수수 취향을 담았다. ‘미나미의 메론빵’은 메론빵을 구현했다. '
+          '‘메이의 시나몬 롤’은 시나몬을 활용했다. ‘제나의 딸기 샌드’는 딸기잼과 크림을 넣었다. '
+          '‘리브의 초코 호떡’은 초코와 꿀호떡을 조합했다.')
+        self.collect();c,r=make_release(self.root,'bgf-news-9999')
+        self.assertIn('신상 빵 5종',c['title']);self.assertIn('09.17부터 순차 출시',c['caption'])
+        self.assertIn('가격은 기사에 명시되지 않았습니다',c['caption']);self.assertEqual(len(r['claims']),4)
+        self.sentence=self.sentence.replace('‘리브의 초코 호떡’','‘리브의 초코 호떡 신상’')
+        self.collect(True)
+        with self.assertRaises(EvidenceError):make_release(self.root,'bgf-news-9999')
+
     def test_paused_category_defers_before_image_creation(self):
         from src.operations import update,DEFAULT
         self.collect();store=Store(self.root)

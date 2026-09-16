@@ -88,6 +88,13 @@ def shinsegae_url(url):
     return url
 
 
+def seoul_url(url):
+    p=urlsplit(url)
+    if p.scheme!='https' or p.netloc!='news.seoul.go.kr' or p.query or p.fragment or not re.fullmatch(r'/culture/archives/[1-9][0-9]{0,9}',p.path):
+        raise ValueError('지원하지 않는 서울시 문화 기사 주소')
+    return url
+
+
 def apgroup_category(title):
     if any(w in title for w in ('선물','기획 세트','모집','연구회','대상 수상')):return None
     if any(w in title for w in ('전시','팝업','시간 여행')):return 'place'
@@ -144,10 +151,26 @@ def shinsegae_sources(results,at):
     return sources[:8]
 
 
+def seoul_sources(results,at):
+    sources=[];seen={s['url'] for s in results}
+    for source in results:
+        if source['id']!='seoul-culture-rss' or source.get('status')!='ok':continue
+        checked=datetime.fromisoformat(source['checked_at'])
+        if checked.tzinfo is None or not timedelta(0)<=at-checked<timedelta(hours=12):continue
+        for c in source.get('candidates',[]):
+            try:url=seoul_url(c['url']);date=parsedate_to_datetime(c['published_at'])
+            except (ValueError,TypeError,KeyError):continue
+            if c.get('category')!='place' or date.tzinfo is None or not timedelta(0)<=at-date<timedelta(days=7) or url in seen:continue
+            seen.add(url);key='seoul-culture-'+urlsplit(url).path.rsplit('/',1)[1]
+            sources.append({'id':key,'url':url,'kind':'html','name':'서울시 새 문화·전시 소식','category':'place','adapter':'seoul-release','headline':c['title'],'published':date.isoformat()})
+    return sources[:8]
+
+
 def fetch_allowed(url, transport=request, robots_cache=None, discovered=False):
     if discovered=='apgroup':apgroup_url(url)
     elif discovered=='bgf':bgf_url(url)
     elif discovered=='shinsegae':shinsegae_url(url)
+    elif discovered=='seoul':seoul_url(url)
     elif url not in ALLOWED:raise ValueError('등록되지 않은 수집 주소')
     parts=urlsplit(url);origin=f'{parts.scheme}://{parts.netloc}'
     cache=robots_cache if robots_cache is not None else {}
@@ -315,10 +338,11 @@ class Collector:
                 if source['id']=='bgf-discovery':pending.extend(dynamic_sources(results,at))
                 if source['id']=='apgroup-discovery':pending.extend(apgroup_sources(results,at))
                 if source['id']=='shinsegae-rss':pending.extend(shinsegae_sources(results,at))
+                if source['id']=='seoul-culture-rss':pending.extend(seoul_sources(results,at))
                 continue
             result={**source,'checked_at':at.isoformat(),'next_check':(at+timedelta(hours=max(1,config.get('interval_hours',6)))).isoformat(),'candidates':[],'checks':[]}
             try:
-                discovered={'apgroup-release':'apgroup','bgf-release':'bgf','shinsegae-release':'shinsegae'}.get(source.get('adapter'),False)
+                discovered={'apgroup-release':'apgroup','bgf-release':'bgf','shinsegae-release':'shinsegae','seoul-release':'seoul'}.get(source.get('adapter'),False)
                 raw=fetch_allowed(source['url'],self.transport,robots,discovered=discovered)
                 parsed=(apgroup_list if source['id']=='apgroup-discovery' else rss_data if source['kind']=='rss' else page_data)(raw,source['url'])
                 if source['kind']=='html' and source['id'] not in ('lghnh-news','bgf-discovery','apgroup-discovery'):parsed['candidates']=[]
@@ -337,6 +361,7 @@ class Collector:
             if source['id']=='bgf-discovery':pending.extend(dynamic_sources(results,at))
             if source['id']=='apgroup-discovery':pending.extend(apgroup_sources(results,at))
             if source['id']=='shinsegae-rss':pending.extend(shinsegae_sources(results,at))
+            if source['id']=='seoul-culture-rss':pending.extend(seoul_sources(results,at))
         report={'updated_at':utcnow().isoformat(),'sources':results,'notice':'발견·문자열 대조 결과이며 원고 전체 사실 검증이나 발행 승인이 아닙니다.'}
         temp=self.report.with_suffix('.tmp');temp.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8');temp.replace(self.report)
         return report
