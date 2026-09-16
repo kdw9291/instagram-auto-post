@@ -33,6 +33,17 @@ class Studio:
             with store.connect() as db:
                 item=db.execute('SELECT source_id FROM items WHERE id=?',(row['item_id'],)).fetchone()
                 if item:db.execute("INSERT OR IGNORE INTO studio_posts(source_id,kind,item_id,version,state,media_id) VALUES(?,'cards',?,?,'published',?)",(item[0],row['item_id'],row['version'],row['media_id']))
+        self.sync_published_items()
+
+    def sync_published_items(self):
+        with self.store.connect() as db:
+            rows=db.execute("SELECT DISTINCT source_id FROM studio_posts WHERE state='published'").fetchall()
+            for row in rows:
+                item=db.execute('SELECT id,state FROM items WHERE source_id=?',(row['source_id'],)).fetchone()
+                if item and item['state']!='published':
+                    db.execute("UPDATE items SET state='published' WHERE id=?",(item['id'],))
+                    self.store.event(db,'Instagram 게시 완료를 확인해 제작물 상태를 게시됨으로 변경했습니다.')
+
     def posts(self):
         with self.store.connect() as db:return [dict(r) for r in db.execute('SELECT * FROM studio_posts')]
 
@@ -87,7 +98,7 @@ class Studio:
             row=db.execute('SELECT * FROM items WHERE id=?',(item_id,)).fetchone()
             if not row or row['version']!=version:raise ValueError('완성본이 바뀌었습니다. 새 버전을 확인해 주세요.')
             item=dict(row);item['content']=json.loads(item['content'])
-        if item['state'] not in ('waiting','ready','approved') or item['content']['sample']:raise ValueError('게시할 수 있는 실제 완성본이 아닙니다.')
+        if item['state'] not in ('waiting','ready','approved','published') or item['content']['sample']:raise ValueError('게시할 수 있는 실제 완성본이 아닙니다.')
         if not valid_bundle(self.store.root,item_id,version,item['content']):raise ValueError('카드 무결성 오류')
         verify_content(self.store.root,item['content'])
         from .store import timestamp,now
@@ -107,7 +118,7 @@ class Studio:
         def work():
             try:
                 self.validate(item_id,version,sha if 'reel' in formats else None)
-                self.store.action(item_id,version,'approve')
+                if item['state']!='published':self.store.action(item_id,version,'approve')
                 with self.store.connect() as db:
                     for kind in formats:db.execute("INSERT INTO studio_posts(source_id,kind,item_id,version,sha,state) VALUES(?,?,?,?,?,'queued')",(item['source_id'],kind,item_id,version,sha if kind=='reel' else None))
                 for kind in formats:self.publish(item,kind,sha)
@@ -119,7 +130,13 @@ class Studio:
 
     def change(self,source,kind,**values):
         if not set(values)<={'state','container','media_id','link','error'}:raise ValueError('상태 필드 오류')
-        with self.store.connect() as db:db.execute('UPDATE studio_posts SET '+','.join(k+'=?' for k in values)+' WHERE source_id=? AND kind=?',(*values.values(),source,kind))
+        with self.store.connect() as db:
+            db.execute('UPDATE studio_posts SET '+','.join(k+'=?' for k in values)+' WHERE source_id=? AND kind=?',(*values.values(),source,kind))
+            if values.get('state')=='published':
+                item=db.execute('SELECT id,state FROM items WHERE source_id=?',(source,)).fetchone()
+                if item and item['state']!='published':
+                    db.execute("UPDATE items SET state='published' WHERE id=?",(item['id'],))
+                    self.store.event(db,'Instagram 게시 완료를 확인해 제작물 상태를 게시됨으로 변경했습니다.')
 
     def publish(self,item,kind,sha):
         from .credentials import load_secret

@@ -7,7 +7,7 @@ import time
 import urllib.request
 from pathlib import Path
 from urllib.parse import urlencode
-from PIL import Image
+from PIL import Image, ImageStat
 
 POLICY='news-photo-v1'
 ENDPOINT='http://127.0.0.1:8188'
@@ -77,13 +77,13 @@ def call(path,body=None,binary=False):
     if len(raw)>20_000_000:raise ValueError('이미지 응답 크기 초과')
     return raw if binary else json.loads(raw)
 
-def workflow(prompt,key,config):
+def workflow(prompt,key,config,attempt=1):
     return {
       '1':{'class_type':'CheckpointLoaderSimple','inputs':{'ckpt_name':config['checkpoint']}},
       '2':{'class_type':'CLIPTextEncode','inputs':{'clip':['1',1],'text':prompt}},
       '3':{'class_type':'CLIPTextEncode','inputs':{'clip':['1',1],'text':'drawing, illustration, cartoon, text, letters, logo, watermark, blurry, deformed'}},
       '4':{'class_type':'EmptyLatentImage','inputs':{'width':832,'height':1088,'batch_size':1}},
-      '5':{'class_type':'KSampler','inputs':{'model':['1',0],'positive':['2',0],'negative':['3',0],'latent_image':['4',0],'seed':int(key[:12],16),'steps':min(40,max(12,config.get('steps',24))),'cfg':6.5,'sampler_name':'euler','scheduler':'normal','denoise':1}},
+      '5':{'class_type':'KSampler','inputs':{'model':['1',0],'positive':['2',0],'negative':['3',0],'latent_image':['4',0],'seed':int(hashlib.sha256(f'{key}:{attempt}'.encode()).hexdigest()[:12],16),'steps':min(40,max(12,config.get('steps',24))),'cfg':6.5,'sampler_name':'euler','scheduler':'normal','denoise':1}},
       '6':{'class_type':'VAEDecode','inputs':{'samples':['5',0],'vae':['1',2]}},
       '7':{'class_type':'SaveImage','inputs':{'images':['6',0],'filename_prefix':'auto-insta/'+key}},
     }
@@ -137,6 +137,9 @@ def tick(root,transport=call):
                 with Image.open(io.BytesIO(raw)) as decoded:
                     if decoded.width<512 or decoded.height<512 or decoded.width*decoded.height>16_000_000:raise ValueError('이미지 규격 오류')
                     decoded.verify()
+                with Image.open(io.BytesIO(raw)) as decoded:
+                    rgb=decoded.convert('RGB');mean=sum(ImageStat.Stat(rgb).mean)/3
+                    if mean<2 or mean>253:raise ValueError('생성 이미지가 빈 화면입니다.')
                 out=Path(root)/'assets/images/news';out.mkdir(parents=True,exist_ok=True)
                 temp=out/f'{key}.tmp';temp.write_bytes(raw);temp.replace(out/f'{key}.png')
                 with db:db.execute("UPDATE jobs SET state='ready',sha=?,error=NULL WHERE id=?",(hashlib.sha256(raw).hexdigest(),key))
@@ -160,7 +163,7 @@ def tick(root,transport=call):
             updated=db.execute("UPDATE jobs SET state='submitting',next_try=?,attempts=attempts+1 WHERE id=? AND state='queued'",(time.time()+60,key)).rowcount
         if not updated:return
         try:
-            result=transport('/prompt',{'prompt':workflow(row['prompt'],key,config),'client_id':key})
+            result=transport('/prompt',{'prompt':workflow(row['prompt'],key,config,row['attempts']+1),'client_id':key})
             if result.get('node_errors') or not result.get('prompt_id'):raise ValueError('생성 요청 검증 실패')
             with db:db.execute("UPDATE jobs SET state='submitted',remote_id=?,error=NULL WHERE id=?",(result['prompt_id'],key))
         except (OSError,ValueError) as e:

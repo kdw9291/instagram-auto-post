@@ -1,5 +1,5 @@
 const $ = (s) => document.querySelector(s);
-const labels = {waiting:'확인 대기',ready:'자동 검수 후 준비',approved:'승인 기록',held:'이번 건 보류',expired:'정보 만료',needs_verification:'원문 검증 대기',awaiting_image:'뉴스 이미지 생성 대기'};
+const labels = {waiting:'확인 대기',ready:'자동 검수 후 준비',approved:'승인 기록',published:'게시됨',held:'이번 건 보류',expired:'정보 만료',needs_verification:'원문 검증 대기',awaiting_image:'뉴스 이미지 생성 대기'};
 const categories = {place:'가볼 곳',beauty:'뷰티 신상',food:'신상 먹거리'};
 let state, selected, slide = 0, busy = false;
 function el(tag, text, cls) { const e=document.createElement(tag); if(text!==undefined)e.textContent=text; if(cls)e.className=cls;return e; }
@@ -21,7 +21,7 @@ function renderOperations(){
 }
 async function refresh() {
   state=await api('/api/state');
-  const available=i=>!i.content.sample && ['waiting','ready','approved'].includes(i.state) && !(state.studio_posts||[]).some(p=>p.source_id===i.source_id && p.kind==='cards' && p.state==='published');
+  const available=i=>!i.content.sample && ['waiting','ready','approved','published'].includes(i.state) && ['cards','reel'].some(kind=>!(state.studio_posts||[]).some(p=>p.source_id===i.source_id && p.kind===kind));
   state.items.sort((a,b)=>Number(available(b))-Number(available(a)));
   const current=state.items.find(i=>i.id===selected);
   if(!current || !available(current)){selected=state.items.find(available)?.id || state.items[0]?.id;slide=0;}
@@ -73,11 +73,11 @@ function renderDetail() {
   const label=el('label','캡션','caption-label');label.htmlFor='caption';const caption=el('textarea');caption.id='caption';caption.value=c.caption;caption.maxLength=2200;target.append(label,caption);
   const actions=el('div',undefined,'actions');
   const approve=el('button',c.sample?'샘플 · 게시 불가':'카드만 게시');approve.disabled=true;approve.onclick=()=>publishFormats(item,['cards']);
-  const save=el('button','캡션 변경 저장','secondary');save.disabled=['held','expired'].includes(item.state);save.onclick=()=>act('edit',item,caption.value);
+  const save=el('button','캡션 변경 저장','secondary');save.disabled=['held','expired','published'].includes(item.state);save.onclick=()=>act('edit',item,caption.value);
   const reelButton=el('button','릴스만 게시','secondary'),both=el('button','둘 다 게시');reelButton.onclick=()=>publishFormats(item,['reel']);both.onclick=()=>publishFormats(item,['cards','reel']);
   const posted=(kind)=>(state.studio_posts||[]).some(p=>p.source_id===item.source_id && p.kind===kind);
-  const setButtons=()=>{const blocked=state.studio?.busy||c.sample||!['waiting','ready','approved'].includes(item.state)||caption.value!==c.caption;approve.disabled=blocked||posted('cards');reelButton.disabled=blocked||!item.reel||posted('reel');both.disabled=approve.disabled||reelButton.disabled;};setButtons();caption.addEventListener('input',setButtons);
-  const hold=el('button','이번 건 보류','secondary');hold.disabled=['held','expired'].includes(item.state);hold.onclick=()=>act('hold',item);actions.append(both,approve,reelButton,save,hold);target.append(actions);
+  const setButtons=()=>{const blocked=state.studio?.busy||c.sample||!['waiting','ready','approved','published'].includes(item.state)||caption.value!==c.caption;approve.disabled=blocked||posted('cards');reelButton.disabled=blocked||!item.reel||posted('reel');both.disabled=approve.disabled||reelButton.disabled;};setButtons();caption.addEventListener('input',setButtons);
+  const hold=el('button','이번 건 보류','secondary');hold.disabled=['held','expired','published'].includes(item.state);hold.onclick=()=>act('hold',item);actions.append(both,approve,reelButton,save,hold);target.append(actions);
   target.append(el('p',c.sample?'샘플은 디자인 확인용입니다.': '공식 자료의 항목별 대조로 작성했습니다. 캡션을 직접 변경하면 근거 재검증 전 승인이 보류됩니다. 게시 버튼을 누르면 확인한 버전을 실제 Instagram에 게시합니다.','muted'));
   const details=el('details');details.append(el('summary','출처와 정보 확인일'));c.sources.forEach(url=>{const p=el('p'),a=el('a',url);a.href=url;a.target='_blank';a.rel='noopener noreferrer';p.append(a);details.append(p);});details.append(el('p',`원고 확인: ${new Date(c.verified_at).toLocaleString('ko-KR')} · ${item.background.label}`));target.append(details);
   if(!c.sample){

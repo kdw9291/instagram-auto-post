@@ -88,6 +88,6 @@ def generation_allowed(root,source_id):
     at=datetime.now(timezone.utc)
     with connection(root) as db:
         existing=next((i for i in items(db) if i['source_id']==source_id),None)
-        if existing and existing['state']=='held':return False
+        if existing and existing['state'] in ('held','published'):return False
         reservation=db.execute('SELECT * FROM admissions WHERE source_id=?',(source_id,)).fetchone()
         return not reservation or (bool(reservation['granted']) and datetime.fromisoformat(reservation['until'])>at)

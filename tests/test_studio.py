@@ -41,5 +41,14 @@ class StudioTests(unittest.TestCase):
         with patch.object(self.studio,'start',side_effect=lambda fn:fn()),patch.object(self.store,'action'),patch.object(self.studio,'publish',side_effect=publish):
             with self.assertRaises(OSError):self.studio.request_publish('item','version',['cards','reel'],'video')
         self.assertEqual({r['kind']:r['state'] for r in self.studio.posts()},{'cards':'published','reel':'interrupted'})
+        with self.store.connect() as db:self.assertEqual(db.execute("SELECT state FROM items WHERE source_id='source'").fetchone()[0],'published')
+
+    def test_published_item_is_synced_and_can_publish_missing_format(self):
+        with self.store.connect() as db:db.execute("INSERT INTO studio_posts(source_id,kind,item_id,version,state) VALUES('source','cards','item','version','published')")
+        studio=Studio(self.store)
+        with self.store.connect() as db:self.assertEqual(db.execute("SELECT state FROM items WHERE id='item'").fetchone()[0],'published')
+        with patch.object(studio,'start',side_effect=lambda fn:fn()),patch.object(self.store,'action') as approve,patch.object(studio,'publish') as publish:
+            studio.request_publish('item','version',['reel'],'video')
+        approve.assert_not_called();publish.assert_called_once()
 
 if __name__=='__main__':unittest.main()

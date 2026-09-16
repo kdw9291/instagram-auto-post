@@ -85,7 +85,7 @@ class Store:
         db.execute('INSERT INTO events(at,message) VALUES(?,?)', (now().isoformat(), message))
 
     def expire(self, db):
-        for row in db.execute("SELECT * FROM items WHERE state NOT IN ('held','expired')").fetchall():
+        for row in db.execute("SELECT * FROM items WHERE state NOT IN ('held','expired','published')").fetchall():
             c = json.loads(row['content'])
             if not c['sample'] and timestamp(c['valid_until']) <= now():
                 db.execute("UPDATE items SET state='expired', approval=NULL WHERE id=?", (row['id'],))
@@ -131,8 +131,8 @@ class Store:
                     validate(c)
                     item_id = digest(c['source_id'])[:16]
                     old = db.execute('SELECT * FROM items WHERE source_id=?', (c['source_id'],)).fetchone()
-                    if old and old['state'] == 'held':
-                        self.event(db, '보류한 소재의 자동 재요청을 건너뛰었습니다.')
+                    if old and old['state'] in ('held','published'):
+                        self.event(db, ('게시한' if old['state']=='published' else '보류한')+' 소재의 자동 재요청을 건너뛰었습니다.')
                     else:
                         version = build_bundle(self.root,item_id,c)
                         review = bool(db.execute('SELECT review FROM settings').fetchone()[0]) or bool(old and old['review'])
@@ -151,6 +151,9 @@ class Store:
 
     def produce_one(self,source_id,maker):
         """Only the internal adapter can create an evidence-verified real draft."""
+        with self.connect() as db:
+            existing=db.execute('SELECT state FROM items WHERE source_id=?',(source_id,)).fetchone()
+            if existing and existing['state'] in ('held','published'):return
         try:
             content,receipt=maker(self.root)
             validate(content)
@@ -160,7 +163,7 @@ class Store:
                 db.execute('BEGIN IMMEDIATE')
                 old=db.execute('SELECT * FROM items WHERE id=?',(item_id,)).fetchone()
                 old_receipt=json.loads(old['verification']) if old and old['verification'] else {}
-                if old and (old['state']=='held' or old_receipt.get('status')=='manual_edit'):return
+                if old and (old['state'] in ('held','published') or old_receipt.get('status')=='manual_edit'):return
                 content=attach(self.root,content,enqueue=True)
                 if old and json.loads(old['content'])==content and old['state']!='needs_verification':return
                 version=build_bundle(self.root,item_id,content)
@@ -174,7 +177,7 @@ class Store:
         except (EvidenceError,ValueError,OSError) as e:
             with self.connect() as db:
                 state='awaiting_image' if isinstance(e,ImagePending) else 'needs_verification'
-                db.execute("UPDATE items SET state=?,approval=NULL WHERE source_id=? AND state NOT IN ('held','expired')",(state,source_id))
+                db.execute("UPDATE items SET state=?,approval=NULL WHERE source_id=? AND state NOT IN ('held','expired','published')",(state,source_id))
                 message=f'자동 원고 보완 대기: {source_id} · {e}'
                 last=db.execute("SELECT message FROM events WHERE message LIKE ? ORDER BY id DESC LIMIT 1",(f'자동 원고 보완 대기: {source_id} · %',)).fetchone()
                 if not last or last['message']!=message:self.event(db,message)
@@ -188,7 +191,7 @@ class Store:
             if revision != current['revision']:
                 raise ValueError('다른 화면에서 설정이 변경되었습니다. 새로고침해 주세요.')
             if review and not current['review']:
-                db.execute("UPDATE items SET review=1, state=CASE WHEN state='ready' AND approval IS NULL THEN 'waiting' ELSE state END WHERE state NOT IN ('held','expired')")
+                db.execute("UPDATE items SET review=1, state=CASE WHEN state='ready' AND approval IS NULL THEN 'waiting' ELSE state END WHERE state NOT IN ('held','expired','published')")
             db.execute('UPDATE settings SET review=?, revision=revision+1', (int(review),))
             self.event(db, '완성본 확인을 ' + ('ON' if review else 'OFF') + '으로 저장했습니다. 기존 확인 요구는 유지됩니다.')
 
@@ -199,7 +202,7 @@ class Store:
             if not row or row['version'] != version:
                 raise ValueError('새 완성본이 있습니다. 새로고침 후 확인해 주세요.')
             c = json.loads(row['content'])
-            if row['state'] in ('held', 'expired') or (not c['sample'] and timestamp(c['valid_until']) <= now()):
+            if row['state'] in ('held', 'expired', 'published') or (not c['sample'] and timestamp(c['valid_until']) <= now()):
                 raise ValueError('보류 또는 만료된 제작물입니다.')
             if action == 'approve':
                 if not valid_bundle(self.root,item_id,version,c):

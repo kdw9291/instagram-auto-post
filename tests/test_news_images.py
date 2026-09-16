@@ -38,6 +38,21 @@ class NewsImageTests(unittest.TestCase):
         image=self.root/'assets/images/news'/f"{content['news_image']['id']}.png";image.write_bytes(b'tampered')
         with self.assertRaises(ImagePending):attach(self.root,self.content)
 
+    def test_blank_image_is_failed_and_retry_changes_seed(self):
+        from src.news_images import connect
+        self.queue();calls=[];data=io.BytesIO();Image.new('RGB',(832,1088),'black').save(data,format='PNG')
+        def transport(path,body=None,binary=False):
+            if path.startswith('/object_info'):return {'CheckpointLoaderSimple':{'input':{'required':{'ckpt_name':[['model.safetensors']]}}}}
+            if path=='/prompt':calls.append(body['prompt']['5']['inputs']['seed']);return {'prompt_id':'job-'+str(len(calls))}
+            if path.startswith('/history'):return {f'job-{len(calls)}':{'status':{'completed':True},'outputs':{'7':{'images':[{'filename':'blank.png','subfolder':'','type':'output'}]}}}}
+            return data.getvalue()
+        tick(self.root,transport);tick(self.root,transport);tick(self.root,transport)
+        self.assertEqual(rows(self.root)[0]['state'],'failed')
+        db=connect(self.root)
+        with db:db.execute('UPDATE jobs SET next_try=1')
+        db.close();tick(self.root,transport);tick(self.root,transport);tick(self.root,transport)
+        self.assertEqual(len(calls),2);self.assertNotEqual(calls[0],calls[1])
+
     def test_uncertain_submit_is_not_repeated(self):
         self.queue();calls=[]
         def transport(path,body=None,binary=False):
