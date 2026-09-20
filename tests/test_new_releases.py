@@ -69,25 +69,26 @@ class NewReleaseTests(unittest.TestCase):
 
     def test_student_recipe_article_keeps_only_two_named_products(self):
         self.title='CU, 한국조리과학고 학생들의 레시피로 만든 간편식 출시!'
+        first_day=self.date.day;second_day=min(first_day+2,28)
         self.sentence=('수상작 1~3위의 레시피를 CU 간편식으로 개발해 이달부터 순차적으로 출시한다. '
-          '학생들의 레시피가 구현된 첫 상품은 이달 10일 출시한 ‘크카당맛있당정식 (5,700 원)’이다. '
-          '오는 22일에는 2위 수상작인 ‘마제소밥 & 함박정식’을 내놓는다. '
+          f'학생들의 레시피가 구현된 첫 상품은 이달 {first_day}일 출시한 ‘크카당맛있당정식 (5,700 원)’이다. '
+          f'오는 {second_day}일에는 2위 수상작인 ‘마제소밥 & 함박정식’을 내놓는다. '
           '3위 수상작 역시 상품 개발을 거쳐 다음달 선보일 예정이다.')
         self.collect();c,r=make_release(self.root,'bgf-news-9999')
         self.assertIn('간편식 2종',c['title']);self.assertIn('5,700원',c['caption'])
         self.assertIn('3위 제품은 제외',c['caption']);self.assertEqual(len(r['claims']),5)
-        self.sentence=self.sentence.replace('오는 22일에는','오는 22일 무렵에는')
+        self.sentence=self.sentence.replace(f'오는 {second_day}일에는',f'오는 {second_day}일 무렵에는')
         self.collect(True)
         with self.assertRaises(EvidenceError):make_release(self.root,'bgf-news-9999')
 
     def test_rescene_bakery_article_keeps_five_named_products(self):
         self.title='리센느 취향 담았다! CU, BAKE405 리센느 빵 5종 출시'
-        self.sentence=('CU는 브랜드 모델 리센느와 협업해 BAKE405 차별화 베이커리 5종을 이달 17일부터 순차적으로 선보인다. '
+        self.sentence=(f'CU는 브랜드 모델 리센느와 협업해 BAKE405 차별화 베이커리 5종을 이달 {self.date.day}일부터 순차적으로 선보인다. '
           '‘BAKE405 원이의 옥수수 크림빵’은 옥수수 취향을 담았다. ‘미나미의 메론빵’은 메론빵을 구현했다. '
           '‘메이의 시나몬 롤’은 시나몬을 활용했다. ‘제나의 딸기 샌드’는 딸기잼과 크림을 넣었다. '
           '‘리브의 초코 호떡’은 초코와 꿀호떡을 조합했다.')
         self.collect();c,r=make_release(self.root,'bgf-news-9999')
-        self.assertIn('신상 빵 5종',c['title']);self.assertIn('09.17부터 순차 출시',c['caption'])
+        self.assertIn('신상 빵 5종',c['title']);self.assertIn(f'{self.date:%m.%d}부터 순차 출시',c['caption'])
         self.assertIn('가격은 기사에 명시되지 않았습니다',c['caption']);self.assertEqual(len(r['claims']),4)
         self.sentence=self.sentence.replace('‘리브의 초코 호떡’','‘리브의 초코 호떡 신상’')
         self.collect(True)

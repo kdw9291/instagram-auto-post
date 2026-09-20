@@ -30,6 +30,7 @@ ALLOWED = {
  'https://stories.amorepacific.com/feed/',
  'https://www.shinsegaegroupnewsroom.com/feed/',
  'https://news.seoul.go.kr/culture/feed',
+ 'https://news.seoul.go.kr/culture',
  'https://seoulboard.seoul.go.kr/rss/RSSGenerator?bbsNo=158',
 
  'https://www.hankyung.com/feed/economy',
@@ -154,7 +155,7 @@ def shinsegae_sources(results,at):
 def seoul_sources(results,at):
     sources=[];seen={s['url'] for s in results}
     for source in results:
-        if source['id']!='seoul-culture-rss' or source.get('status')!='ok':continue
+        if source['id']!='seoul-culture-home' or source.get('status')!='ok':continue
         checked=datetime.fromisoformat(source['checked_at'])
         if checked.tzinfo is None or not timedelta(0)<=at-checked<timedelta(hours=12):continue
         for c in source.get('candidates',[]):
@@ -235,6 +236,39 @@ class Page(HTMLParser):
             if self.anchor:self.anchor['text']+=data.strip()+' '
             if self.cell is not None:self.cell+=data.strip()+' '
 
+
+class SeoulIndex(HTMLParser):
+    """Extract dated article links from the official culture homepage cards."""
+    def __init__(self):
+        super().__init__();self.item=None;self.field=None;self.field_tag=None;self.items=[]
+    def handle_starttag(self,tag,attrs):
+        a=dict(attrs)
+        if tag=='a' and re.fullmatch(r'https://news\.seoul\.go\.kr/culture/archives/[1-9][0-9]{0,9}',a.get('href','')):
+            self.item={'url':a['href'],'title':'','date':''}
+        if self.item and tag in ('strong','span','em'):
+            classes=a.get('class','').split()
+            if 'tit' in classes or 'title-ellipsis' in classes:self.field='title';self.field_tag=tag
+            elif 'date' in classes:self.field='date';self.field_tag=tag
+    def handle_data(self,data):
+        if self.item and self.field:self.item[self.field]+=data+' '
+    def handle_endtag(self,tag):
+        if self.item and self.field_tag==tag:self.field=None;self.field_tag=None
+        if tag=='a' and self.item:
+            if self.item['title'] and re.search(r'20\d{2}-\d{2}-\d{2}',self.item['date']):self.items.append(self.item)
+            self.item=None;self.field=None;self.field_tag=None
+
+
+def seoul_index(raw,url):
+    page=Page();page.feed(raw)
+    index=SeoulIndex();index.feed(raw);candidates=[];seen=set()
+    for item in index.items:
+        title=' '.join(item['title'].split());match=re.search(r'20\d{2}-\d{2}-\d{2}',item['date'])
+        category=classify(title)
+        if not match or not category or item['url'] in seen:continue
+        date=datetime.fromisoformat(match.group()).replace(tzinfo=timezone(timedelta(hours=9)))
+        seen.add(item['url']);candidates.append({'title':title,'url':item['url'],'category':category,'published_at':format_datetime(date),'status':'discovered'})
+    return {'title':'서울시 문화 최신 소식','text':'\n'.join(page.parts),'candidates':candidates[:20]}
+
 def normalize(value):return re.sub(r'\s+','',value).replace('～','~').replace('–','-')
 
 def classify(title):
@@ -243,7 +277,7 @@ def classify(title):
     if any(w in title for w in ('편의점','마트')) and not any(w in title for w in ('출시','신상','신제품','먹거리','디저트','빵','도시락','김밥','라면','과자','아이스크림')):return None
     cafe=any(brand in title for brand in ('스타벅스','투썸','메가MGC커피','컴포즈커피','이디야','파리바게뜨','뚜레쥬르')) and any(action in title for action in ('출시','선보인다','신메뉴')) and any(w in title for w in ('커피','라떼','음료','티','케이크','샌드위치','디저트','빵'))
     if cafe:return 'food'
-    for category, words in [('place',('전시','팝업','미술관','데이트','문화행사','빛축제','야간개장','드론라이트쇼','드론 라이트쇼','메이커 페어','북촌음악회','시간 여행','무료 공연','축제','플리마켓')),('beauty',('화장품','립스틱','틴트','스킨케어','뷰티 신상','클렌저','세럼','선크림','쿠션','에센스','립밤','향수','바디케어','바디 컬렉션','헤어케어')),('food',('편의점','마트 신상','신상 먹거리','신상 디저트','신제품 빵'))]:
+    for category, words in [('place',('전시','팝업','미술관','박물관','한가위','문화 스테이지','데이트','문화행사','빛축제','야간개장','드론라이트쇼','드론 라이트쇼','메이커 페어','북촌음악회','시간 여행','무료 공연','축제','플리마켓')),('beauty',('화장품','립스틱','틴트','스킨케어','뷰티 신상','클렌저','세럼','선크림','쿠션','에센스','립밤','향수','바디케어','바디 컬렉션','헤어케어')),('food',('편의점','마트 신상','신상 먹거리','신상 디저트','신제품 빵'))]:
         if any(word in title for word in words):return category
     return None
 
@@ -338,14 +372,14 @@ class Collector:
                 if source['id']=='bgf-discovery':pending.extend(dynamic_sources(results,at))
                 if source['id']=='apgroup-discovery':pending.extend(apgroup_sources(results,at))
                 if source['id']=='shinsegae-rss':pending.extend(shinsegae_sources(results,at))
-                if source['id']=='seoul-culture-rss':pending.extend(seoul_sources(results,at))
+                if source['id']=='seoul-culture-home':pending.extend(seoul_sources(results,at))
                 continue
             result={**source,'checked_at':at.isoformat(),'next_check':(at+timedelta(hours=max(1,config.get('interval_hours',6)))).isoformat(),'candidates':[],'checks':[]}
             try:
                 discovered={'apgroup-release':'apgroup','bgf-release':'bgf','shinsegae-release':'shinsegae','seoul-release':'seoul'}.get(source.get('adapter'),False)
                 raw=fetch_allowed(source['url'],self.transport,robots,discovered=discovered)
-                parsed=(apgroup_list if source['id']=='apgroup-discovery' else rss_data if source['kind']=='rss' else page_data)(raw,source['url'])
-                if source['kind']=='html' and source['id'] not in ('lghnh-news','bgf-discovery','apgroup-discovery'):parsed['candidates']=[]
+                parsed=(apgroup_list if source['id']=='apgroup-discovery' else seoul_index if source['id']=='seoul-culture-home' else rss_data if source['kind']=='rss' else page_data)(raw,source['url'])
+                if source['kind']=='html' and source['id'] not in ('lghnh-news','bgf-discovery','apgroup-discovery','seoul-culture-home'):parsed['candidates']=[]
                 if source['id']=='bgf-discovery':parsed['candidates']=[c for c in parsed['candidates'] if c['title'].startswith('보도자료 ')]
                 result.update(status='ok',title=parsed['title'],candidates=parsed['candidates'],checks=compare(source['id'],parsed['text']),fetched_count=parsed.get('fetched_count'),sha256=hashlib.sha256(raw.encode()).hexdigest())
                 snapshot={'url':source['url'],'checked_at':result['checked_at'],'text':parsed['text'],'tables':parsed.get('tables',[]),'fields':parsed.get('fields',{})}
@@ -361,7 +395,7 @@ class Collector:
             if source['id']=='bgf-discovery':pending.extend(dynamic_sources(results,at))
             if source['id']=='apgroup-discovery':pending.extend(apgroup_sources(results,at))
             if source['id']=='shinsegae-rss':pending.extend(shinsegae_sources(results,at))
-            if source['id']=='seoul-culture-rss':pending.extend(seoul_sources(results,at))
+            if source['id']=='seoul-culture-home':pending.extend(seoul_sources(results,at))
         report={'updated_at':utcnow().isoformat(),'sources':results,'notice':'발견·문자열 대조 결과이며 원고 전체 사실 검증이나 발행 승인이 아닙니다.'}
         temp=self.report.with_suffix('.tmp');temp.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8');temp.replace(self.report)
         return report
