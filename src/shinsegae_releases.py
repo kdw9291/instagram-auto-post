@@ -70,6 +70,65 @@ def food_content(key,title,article,published,sources,claims):
         'image_subject':'Photorealistic fictional autumn cafe drink with golden sweet-potato colored foam beside roasted chestnuts and a plain castella cake, warm window light, no cup logo, packaging or writing'}
 
 
+def beauty_content(key,url,title,article,published,sources,claims):
+    text=normalize(article)
+    if url!='https://www.shinsegaegroupnewsroom.com/collection-perfume-launch/' or title!='로에베 퍼퓸, ‘크래프티드 컬렉션’ 신규 향수 5종 출시':
+        raise EvidenceError('지원하지 않는 신세계 뷰티 기사입니다.')
+    if '크래프티드컬렉션(CraftedCollection)’에신규향수5종을추가하며라인업을확대한다.' not in text:
+        raise EvidenceError('향수 컬렉션과 신규 제품 수 확인 실패')
+    products=re.findall(r'<([^<>]{2,45} EDP)>',article)
+    expected=['필드 다이어리 EDP','스위트 우드랜드 EDP','로즈토피아 EDP','스모키 레인 EDP','버던트 그로브 EDP']
+    if products!=expected:raise EvidenceError('신규 향수 5종 이름 확인 실패')
+    price=re.search(r'가격은오드퍼퓸(\d+)ml에(\d+)만(\d+)천원대다\.',text)
+    if not price:raise EvidenceError('향수 용량·발표 가격 확인 실패')
+    volume=int(price[1]);announced=int(price[2])*10000+int(price[3])*1000
+    if volume!=100 or announced!=533000:raise EvidenceError('향수 용량·발표 가격이 예상 범위와 다릅니다.')
+    claims.extend([
+      evidence(sources,key,'collection','크래프티드 컬렉션','publisher-body-collection'),
+      evidence(sources,key,'products',products,'publisher-body-five-products'),
+      evidence(sources,key,'capacity_ml',volume,'publisher-body-price-sentence'),
+      evidence(sources,key,'announced_price_krw',announced,'publisher-body-price-sentence'),
+    ])
+    names=' · '.join(name.replace(' EDP','') for name in products)
+    return {'source_id':key,'category':'beauty','title':'로에베 퍼퓸\n새 향수 5종','subtitle':'크래프티드 컬렉션\n신세계 공식 발표 기준',
+      'intro_heading':'자연에서 영감 받은 다섯 향','intro':names+'\n각 제품은 오 드 퍼퓸 100ml',
+      'facts':[{'label':'제품 수','value':'신규 향수 5종'},{'label':'용량','value':'각 100ml 오 드 퍼퓸'},{'label':'발표 가격','value':'각 53만3천원대'}],
+      'cta':'다섯 가지 향을\n공식 안내에서 비교','conditions':'공식 출시 자료를 정리한 정보입니다.\n향의 느낌은 개인마다 다를 수 있습니다.',
+      'caption':'로에베 퍼퓸 크래프티드 컬렉션 신규 향수 5종 출시 소식입니다.\n제품: '+', '.join(products)+f'\n용량·발표 가격: 각 {volume}ml · {announced:,}원대\n공식 출시 자료를 정리했으며 직접 사용 후기가 아닙니다. 판매처별 재고와 실제 결제금액은 구매 전 확인하세요.',
+      'image_subject':'Photorealistic botanical ingredient still life on dark stone, five separate natural arrangements of mandarin peel, rose petals, rain-dark cedar wood, pistachios and glossy green leaves, delicate morning mist and refined soft gallery light, close-up nature magazine composition, no manufactured objects, containers, bottles, packaging, text, letters, labels or logos'}
+
+
+def hangawi_content(key,url,title,article,published,at,sources,claims):
+    text=normalize(article)
+    if url!='https://www.shinsegaegroupnewsroom.com/a-hangawi-cultural-vacation-to-starfield/' or '스타필드로 떠나는 ‘한가위 문화 바캉스’' not in title:
+        raise EvidenceError('지원하지 않는 신세계 장소 기사입니다.')
+    required=(
+      '스타필드하남은9월19일부터10월1일까지‘벌룬테마여행’을콘셉트로',
+      '‘바우덕이풍물놀이’가스타필드수원(9/24)과안성(9/25)에서차례로진행',
+      '스타필드고양(9/25)은한국민속촌출신배우들',
+      '별마당도서관은코엑스몰(9/25)과수원(9/26)에서추석특집콘서트',
+    )
+    if not all(value in text for value in required):raise EvidenceError('스타필드 점포별 한가위 일정 확인 실패')
+    end=datetime(published.year,10,2,tzinfo=KST)
+    if at>=end:raise EvidenceError('스타필드 한가위 행사가 종료됐습니다.')
+    schedule=[
+      {'place':'스타필드 하남','date':'09.19–10.01','program':'벌룬 테마 여행'},
+      {'place':'스타필드 수원·안성','date':'09.24·09.25','program':'바우덕이 풍물놀이'},
+      {'place':'스타필드 고양','date':'09.25','program':'조선 퍼레이드·마당극'},
+      {'place':'코엑스몰·수원','date':'09.25·09.26','program':'한가위 국악 콘서트'},
+    ]
+    claims.extend([
+      evidence(sources,key,'event','스타필드 한가위 문화 바캉스','publisher-body-event'),
+      evidence(sources,key,'schedule',schedule,'publisher-body-store-schedule'),
+    ])
+    return {'source_id':key,'category':'place','title':'스타필드 한가위\n문화 일정 모음','subtitle':'09/24–10/01 남은 일정\n신세계 공식 발표 기준',
+      'intro_heading':'점포마다 다른 한가위 문화 행사','intro':'하남 · 수원 · 안성 · 고양 · 코엑스몰\n벌룬 전시 · 전통 공연 · 국악 콘서트',
+      'facts':[{'label':'하남','value':'10/01까지 벌룬 테마 여행'},{'label':'전통 공연','value':'수원 9/24 · 안성·고양 9/25'},{'label':'국악 콘서트','value':'코엑스몰 9/25 · 수원 9/26'}],
+      'cta':'가까운 점포 일정 저장\n방문 전 시간 확인','conditions':'기사에 없는 세부 시간·참여 조건은\n각 점포 공식 안내에서 확인하세요.',
+      'caption':'스타필드 한가위 문화 바캉스의 남은 일정을 정리했습니다.\n하남: 10/1까지 벌룬 테마 여행\n수원: 9/24 바우덕이 풍물놀이 · 9/26 한가위 국악 콘서트\n안성: 9/25 바우덕이 풍물놀이\n고양: 9/25 조선 퍼레이드·마당극\n코엑스몰: 9/25 한가위 국악 콘서트\n세부 시간·위치·참여 조건은 방문 전 각 점포 공식 안내에서 확인하세요.',
+      'image_subject':'Photorealistic fictional Korean shopping atrium during Chuseok, elegant moon jar inspired balloon art, subtle traditional folk performance stage and warm festive lighting, spacious family culture event atmosphere, no logos, writing or identifiable faces','_ends':end}
+
+
 def make_release(root,key,at=None):
     at=at or datetime.now(timezone.utc)
     try:
@@ -85,7 +144,9 @@ def make_release(root,key,at=None):
         if title not in body:raise EvidenceError('목록과 신세계 기사 제목 불일치')
         article=article_body(body);claims=[evidence(sources,key,'publication',published.date().isoformat(),'rss-publication')]
         category=entry.get('category')
-        if category=='place':content=popup_content(key,url,title,article,published,at,sources,claims)
+        if category=='place':
+            content=hangawi_content(key,url,title,article,published,at,sources,claims) if url.endswith('/a-hangawi-cultural-vacation-to-starfield/') else popup_content(key,url,title,article,published,at,sources,claims)
+        elif category=='beauty':content=beauty_content(key,url,title,article,published,sources,claims)
         elif category=='food':content=food_content(key,title,article,published,sources,claims)
         else:raise EvidenceError('지원하지 않는 신세계 기사 분야입니다.')
         end=content.pop('_ends',published+timedelta(days=7))

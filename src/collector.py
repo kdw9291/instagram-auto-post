@@ -83,9 +83,15 @@ def shinsegae_url(url):
     p=urlsplit(url)
     if p.scheme!='https' or p.netloc!='www.shinsegaegroupnewsroom.com' or p.query or p.fragment or not re.fullmatch(r'/[a-z0-9][a-z0-9-]{2,150}/',p.path):
         raise ValueError('지원하지 않는 신세계 뉴스룸 주소')
-    # The RSS entry for this release points at its image-only MEDIA page.
-    if p.path=='/diptyque-les-rituels-de-soin-seongsu-popup-3/':
-        return 'https://www.shinsegaegroupnewsroom.com/diptyque-les-rituels-de-soin-seongsu-popup/'
+    # Some RSS entries point at image-only MEDIA pages. Verify against the
+    # matching full official article instead of treating tag text as evidence.
+    media_to_article={
+      '/diptyque-les-rituels-de-soin-seongsu-popup-3/':'/diptyque-les-rituels-de-soin-seongsu-popup/',
+      '/collection-perfume-launch-3/':'/collection-perfume-launch/',
+      '/a-hangawi-cultural-vacation-to-starfield-7/':'/a-hangawi-cultural-vacation-to-starfield/',
+    }
+    if p.path in media_to_article:
+        return 'https://www.shinsegaegroupnewsroom.com'+media_to_article[p.path]
     return url
 
 
