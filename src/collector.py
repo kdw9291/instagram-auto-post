@@ -279,6 +279,7 @@ def normalize(value):return re.sub(r'\s+','',value).replace('～','~').replace('
 
 def classify(title):
     if any(x in title for x in ('선물세트','선물 세트','기획 세트','생활소품','치료','환자','주가','실적','ATM','은행','현금인출','채용','모집')):return None
+    if any(x in title for x in ('플로깅','봉사활동','봉사 활동','상생 활동','시장 만들기')) and not any(x in title for x in ('팝업','전시','공연','축제','문화행사')):return None
     if any(brand in title for brand in ('CU','GS25','세븐일레븐','이마트','롯데마트','홈플러스','트레이더스')) and any(action in title for action in ('출시','신상','신제품')) and any(w in title for w in ('빵','베이커리','베이글','쿠키','과자','아이스크림','젤라또','도시락','간편식','김밥','라면','우동','커피','라테')):return 'food'
     if any(w in title for w in ('편의점','마트')) and not any(w in title for w in ('출시','신상','신제품','먹거리','디저트','빵','도시락','김밥','라면','과자','아이스크림')):return None
     cafe=any(brand in title for brand in ('스타벅스','투썸','메가MGC커피','컴포즈커피','이디야','파리바게뜨','뚜레쥬르')) and any(action in title for action in ('출시','선보인다','신메뉴')) and any(w in title for w in ('커피','라떼','음료','티','케이크','샌드위치','디저트','빵'))

@@ -13,3 +13,6 @@ class ExpandedSourcesTests(unittest.TestCase):
     def test_gifts_remain_excluded(self):
         self.assertIsNone(classify('뷰티 선물 세트 출시'))
         self.assertIsNone(classify('설화수 기획 세트 출시'))
+
+    def test_corporate_cleanup_is_not_a_place_candidate(self):
+        self.assertIsNone(classify('스타벅스-경동시장, 추석 앞두고 쾌적한 시장 만들기 플로깅 활동 전개'))

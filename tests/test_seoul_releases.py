@@ -19,7 +19,7 @@ class SeoulReleaseTests(unittest.TestCase):
 
     def write_source(self,text,title='2026 서울로미디어캔버스 세 번째 전시',article_id='534430',published=None):
         self.url=f'https://news.seoul.go.kr/culture/archives/{article_id}';self.key=f'seoul-culture-{article_id}'
-        out=self.root/'data/runtime/collection';out.mkdir(parents=True)
+        out=self.root/'data/runtime/collection';out.mkdir(parents=True,exist_ok=True)
         source={'url':self.url,'checked_at':self.at.isoformat(),'text':text,'tables':[],'fields':{}}
         raw=json.dumps(source,ensure_ascii=False,sort_keys=True).encode();digest=hashlib.sha256(raw).hexdigest()
         (out/f'{self.key}-{digest}.json').write_bytes(raw)
@@ -57,6 +57,25 @@ class SeoulReleaseTests(unittest.TestCase):
         content,receipt=make_release(self.root,self.key,self.at)
         self.assertIn('무료 박물관 행사',content['title']);self.assertIn('13:00–17:00',content['caption'])
         self.assertEqual(len(receipt['claims']),6);self.assertIn('실제 행사 현장',content['caption'])
+
+    def test_labelled_performance_ignores_ai_summary(self):
+        self.at=datetime(2026,9,23,12,tzinfo=KST)
+        title='2026 누구나 클래식 with 대전시립교향악단'
+        detail='''○ 공연개요
+- 공연명: 2026 누구나 클래식 with 대전시립교향악단
+- 일시/장소: 2026.11.10.(화), 19:30 / 세종문화회관 대극장
+- 출연진
+∙ 지 휘: 여자경
+∙ 공연시간: 120분(인터미션 20분)＊앵콜에 따라 변동
+∙ 관람연령: 취학아동 이상(2019년 이전 출생자)
+∙ 티켓가격: 관람료 선택제 (1천원, 3천원, 5천원, 1만원 중 관객이 직접 결정)
+○ 신청개요'''
+        self.write_source(title+'\nAI 요약\n잘못된 장소와 무료 공연\n'+detail,title,'534564',datetime(2026,9,22,tzinfo=KST))
+        content,receipt=make_release(self.root,self.key,self.at)
+        self.assertIn('세종문화회관 대극장',content['caption']);self.assertNotIn('무료',content['caption'])
+        self.assertEqual(len(receipt['claims']),7)
+        self.write_source(title+'\nAI 요약\n'+detail.replace('∙ 공연시간: 120분(인터미션 20분)＊앵콜에 따라 변동\n',''),title,'534564',datetime(2026,9,22,tzinfo=KST))
+        with self.assertRaises(EvidenceError):make_release(self.root,self.key,self.at)
 
 
 if __name__=='__main__':unittest.main()

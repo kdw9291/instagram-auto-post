@@ -64,6 +64,19 @@ class ApgroupNewsTests(unittest.TestCase):
         self.collect(True)
         with self.assertRaises(EvidenceError):make_news(self.root,self.keys[0])
 
+    def test_popup_uses_only_one_confirmed_venue_and_period(self):
+        self.titles[0]="설화수, 자음생크림 60주년 팝업스토어 'Beauty Crafted in Time' 오픈"
+        self.bodies[0]="""설화수가 팝업스토어 'Beauty Crafted in Time'을 선보인다.
+팝업 공간은 웰컴 및 시네마 존, 진생 에너지 및 스탬프 카드 체험 등으로 구성되어 있다.
+팝업은 9월 21일부터 27일까지 신세계백화점 강남점을 시작으로 롯데백화점 부산본점, 현대백화점 대구점 등에서 이어질 예정이다."""
+        self.collect();c,r=make_news(self.root,self.keys[0],self.date+timedelta(days=1))
+        self.assertIn('신세계백화점 강남점',c['caption']);self.assertIn('후속 점포 일정',c['caption'])
+        self.assertNotIn('무료',c['caption']);self.assertNotIn('예약 후 참여',c['caption'])
+        self.assertEqual(len(r['claims']),5)
+        self.bodies[0]+='\n팝업은 9월 22일부터 28일까지 현대백화점 무역센터점을 시작으로 이어진다.'
+        self.collect(True)
+        with self.assertRaises(EvidenceError):make_news(self.root,self.keys[0],self.date+timedelta(days=1))
+
     def test_recent_dynamic_news_precede_fixed_sources(self):
         from src.editorial import editorial_adapters
         self.collect()

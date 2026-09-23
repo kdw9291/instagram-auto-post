@@ -61,6 +61,8 @@ def beauty(key,title,article,published,sources,claims):
 
 
 def place(key,title,article,published,sources,claims,at):
+    if '팝업' in title:
+        return popup(key,title,article,published,sources,claims,at)
     names=re.findall(r"['‘]([^'’]{2,40})['’]",title)
     if len(names)!=1:raise EvidenceError('행사 이름이 모호합니다.')
     name=names[0]
@@ -89,6 +91,35 @@ def place(key,title,article,published,sources,claims,at):
         'facts':[{'label':'진행 장소','value':venue},{'label':'참여 조건','value':condition},{'label':'추가 확인','value':extra}],
         'cta':'방문 전 확인\n참여 조건과 시간','conditions':'운영시간·예약 여부는 공식 안내 확인\n'+extra,'caption':name+' 프로그램 소식입니다.\n장소: '+venue+'\n기간: '+period+'\n참여 조건: '+condition+'\n'+extra+'\n입장료·운영시간·예약 조건은 공식 안내에서 확인하세요.',
         'image_subject':scene+'. Photographic editorial interpretation, not a real venue photograph','_ends':end}
+
+
+def popup(key,title,article,published,sources,claims,at):
+    """Verify a popup only when one current venue and its full period share a sentence."""
+    names=re.findall(r"['‘]([^'’]{2,80})['’]",title)
+    if len(names)!=1 or names[0] not in article:raise EvidenceError('팝업 이름이 모호합니다.')
+    name=names[0]
+    schedule=unique(r"팝업은 (\d{1,2})월 (\d{1,2})일부터 (\d{1,2})일까지 ([가-힣A-Za-z0-9 ·]+?점)을 시작으로",article,'팝업 장소·운영 기간')
+    start=datetime(published.year,int(schedule[1]),int(schedule[2]),tzinfo=KST)
+    end=datetime(published.year,int(schedule[1]),int(schedule[3]),tzinfo=KST)+timedelta(days=1)
+    venue=schedule[4].strip()
+    if not start<end or not -7<=(start-published).days<=90 or end<=at:raise EvidenceError('팝업 기간이 모호하거나 종료됐습니다.')
+    experience=unique(r"팝업 공간은 (.+?) 등으로 구성되어 있다\.",article,'팝업 공간 구성')[1].strip()
+    if len(experience)>120:raise EvidenceError('팝업 공간 구성이 너무 깁니다.')
+    experience_label=experience.replace(' 및 ',' · ')
+    period=f'{start:%Y.%m.%d} — {end-timedelta(days=1):%m.%d}'
+    claims.extend([
+      evidence(sources,key,'popup',name,'headline-and-popup-introduction'),
+      evidence(sources,key,'venue',venue,'same-popup-schedule-sentence'),
+      evidence(sources,key,'period',period,'same-popup-schedule-sentence'),
+      evidence(sources,key,'experience',experience,'popup-space-sentence'),
+    ])
+    return {'source_id':key,'category':'place','title':'이번 주 새 팝업\n장소와 기간 한눈에','subtitle':name+'\n브랜드 공식 발표 기준',
+      'intro_heading':'지금 확인할 첫 일정','intro':venue+'\n'+period+'\n브랜드 공식 팝업',
+      'facts':[{'label':'진행 장소','value':venue},{'label':'운영 기간','value':period},{'label':'공간 구성','value':experience_label}],
+      'cta':'방문 전 확인\n운영시간과 입장 조건','conditions':'운영시간·예약·입장 조건은 공식 안내 확인\n후속 백화점 일정은 별도 공지 확인',
+      'caption':name+' 팝업 소식입니다.\n장소: '+venue+'\n기간: '+period+'\n공간 구성: '+experience+' 등. 운영시간·예약·입장 조건과 후속 점포 일정은 방문 전 공식 페이지에서 확인하세요.',
+      'image_subject':'An architectural still-life photograph of a completely empty fictional luxury beauty pop-up gallery inspired by time and ginseng heritage, warm ivory and muted gold rooms, subtle circular time motifs and abstract sculptural ginseng roots. The entire space is unoccupied: no people, human figures, faces, mannequins, portraits or cosmetics packaging; no logos or readable text. This is not the real venue',
+      '_ends':end}
 
 
 def adapters(root):

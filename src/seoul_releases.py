@@ -10,6 +10,50 @@ from .editorial import EvidenceError, KST, load_sources, moment, normalize
 from .products import evidence, finish
 
 
+def labelled_performance(sources,key,title,published,text,at):
+    """Read facts only from the publisher's labelled performance overview, never its AI summary."""
+    compact=normalize(text)
+    if '공연' not in title and '클래식' not in title:return None
+    if compact.count('○공연개요')!=1:return None
+    detail=text.split('○ 공연개요',1)[1].split('○ 신청개요',1)[0]
+    body=normalize(detail)
+    name_match=re.search(r'-\s*공연명:\s*(.+?)\s*-\s*일시/장소:',detail,re.DOTALL)
+    schedule=re.search(r'-\s*일시/장소:\s*(20\d{2})\.(\d{1,2})\.(\d{1,2})\.\(([월화수목금토일])\),\s*(\d{1,2}):(\d{2})\s*/\s*(.+?)(?:\n\s*-\s*출연진|\n\s*∙\s*지\s*휘:)',detail,re.DOTALL)
+    runtime=re.search(r'∙공연시간:(\d+)분\(인터미션(\d+)분\)',body)
+    age=re.search(r'∙관람연령:취학아동이상\((20\d{2})년이전출생자\)',body)
+    prices=re.search(r'∙티켓가격:관람료선택제\((1천원,3천원,5천원,1만원)중',body)
+    if not all((name_match,schedule,runtime,age,prices)):raise EvidenceError('공연 개요의 이름·일시·장소·관람 조건 확인 실패')
+    name=' '.join(name_match[1].split())
+    if normalize(name)!=normalize(title):raise EvidenceError('공연 제목과 본문 공연명이 다릅니다.')
+    year,month,day=map(int,schedule.groups()[:3]);weekday=schedule[4];hour=int(schedule[5]);minute=int(schedule[6]);venue=' '.join(schedule[7].split())
+    start=datetime(year,month,day,hour,minute,tzinfo=KST)
+    minutes=int(runtime[1]);intermission=int(runtime[2]);birth_year=int(age[1])
+    end=start+timedelta(minutes=minutes)
+    if '월화수목금토일'[start.weekday()]!=weekday or end<=at or not 30<=minutes<=300 or not 0<=intermission<minutes or birth_year>year:raise EvidenceError('공연 일정 또는 관람 조건이 올바르지 않습니다.')
+    price_options='1천원 · 3천원 · 5천원 · 1만원 중 선택'
+    date_label=f'{start:%Y.%m.%d} · {start:%H:%M}'
+    claims=[
+      evidence(sources,key,'event_title',name,'publisher-labelled-performance-name'),
+      evidence(sources,key,'datetime',start.isoformat(),'publisher-labelled-datetime-and-venue'),
+      evidence(sources,key,'venue',venue,'publisher-labelled-datetime-and-venue'),
+      evidence(sources,key,'runtime_minutes',minutes,'publisher-labelled-runtime'),
+      evidence(sources,key,'admission_age',f'{birth_year}년 이전 출생자','publisher-labelled-admission-age'),
+      evidence(sources,key,'ticket_price_options',price_options,'publisher-labelled-ticket-price'),
+      evidence(sources,key,'publication',published.date().isoformat(),'homepage-publication'),
+    ]
+    c={'source_id':key,'category':'place','title':'11월에 만나는\n누구나 클래식','subtitle':'대전시립교향악단\n서울시 공식 안내 기준',
+      'intro_heading':'공연 일정부터 확인해요','intro':date_label+'\n'+venue+'\n공연시간 120분',
+      'facts':[{'label':'일시·장소','value':date_label+' · '+venue},{'label':'관람 연령','value':f'취학아동 이상 · {birth_year}년 이전 출생자'},{'label':'관람료 선택제','value':price_options}],
+      'cta':'공연 일정 저장\n예매는 공식 페이지 확인','conditions':'공연시간은 앵콜 여부에 따라 달라질 수 있습니다.\n좌석·예매 가능 여부는 공식 안내 확인',
+      'caption':name+' 공연 소식입니다.\n일시: '+date_label+'\n장소: '+venue+f'\n공연시간: {minutes}분(인터미션 {intermission}분, 앵콜에 따라 변동 가능)\n관람 연령: 취학아동 이상({birth_year}년 이전 출생자)\n관람료 선택제: '+price_options+'\n좌석과 일반 예매 가능 여부는 공식 페이지에서 확인하세요.',
+      'image_subject':'A realistic editorial photograph of a fictional grand classical concert hall with an anonymous symphony orchestra seen from a distance, warm amber stage lights, elegant deep burgundy and gold atmosphere, no identifiable musicians, logos or readable text. This is not the real performance',}
+    c,r=finish(c,claims,sources,'seoul-labelled-performance-v1')
+    c['valid_until']=min(moment(c['valid_until']),end).isoformat()
+    c['caption']=c['caption'].replace('직접 사용·시식 후기','직접 관람 후기').replace('실제 제품·발색·단면','실제 공연 현장·출연진')
+    r['scope']='서울시 본문 중 AI 요약을 제외한 공연개요의 제목·일시·장소·관람 조건 대조'
+    return c,r
+
+
 def holiday_event(sources,key,title,published,text,at):
     """Verify the two labelled, free Chuseok museum event formats."""
     compact=normalize(text)
@@ -74,6 +118,8 @@ def make_release(root,key,at=None):
         if normalize(title) not in text:raise EvidenceError('RSS와 공식 원문 제목이 다릅니다.')
         holiday=holiday_event(sources,key,title,published,source['text'],at)
         if holiday:return holiday
+        performance=labelled_performance(sources,key,title,published,source['text'],at)
+        if performance:return performance
         if not re.fullmatch(r'20\d{2}서울로미디어캔버스.+전시',normalize(title)):
             raise EvidenceError('이 서울시 전시 형식의 검증 규칙이 필요합니다.')
         period=re.search(r'전시기간:(20\d{2})년(\d{1,2})월(\d{1,2})일~(20\d{2})년(\d{1,2})월(\d{1,2})일',text)
