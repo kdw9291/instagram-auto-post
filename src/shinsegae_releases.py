@@ -22,6 +22,21 @@ def article_body(text):
 
 def popup_content(key,url,title,article,published,at,sources,claims):
     text=normalize(article)
+    generic=re.search(r'신세계백화점은\s*(\d{1,2})월\s*(\d{1,2})일부터\s*오는\s*(\d{1,2})월\s*(\d{1,2})일까지\s*([^\n.]{2,60}?)에서\s*「([^」]{2,80})」을\s*운영한다고\s*밝혔다\.',article)
+    if generic and '팝업' in title:
+        start=datetime(published.year,int(generic[1]),int(generic[2]),tzinfo=KST)
+        end=datetime(published.year,int(generic[3]),int(generic[4]),tzinfo=KST)+timedelta(days=1)
+        venue=generic[5];event=generic[6]
+        if not start<end or not -14<=(start-published).days<=90 or at>=end:raise EvidenceError('신세계 팝업 일정이 모호하거나 종료됐습니다.')
+        booking=re.search(r'100%현장예약\(키오스크\)을통해「?[^」]{0,40}」?팝업을이용할수있다\.',text)
+        if not booking:raise EvidenceError('신세계 팝업 입장 방식을 확인할 수 없습니다.')
+        period=f'{start:%Y.%m.%d} — {end-timedelta(days=1):%m.%d}'
+        name=event.replace('기간한정','').strip()
+        facts=[{'label':'운영 기간','value':period},{'label':'진행 장소','value':venue},{'label':'입장 방식','value':'100% 현장예약 · 키오스크'}]
+        claims.extend([evidence(sources,key,'event',event,'publisher-body-popup-schedule'),evidence(sources,key,'period',period,'publisher-body-popup-schedule'),evidence(sources,key,'venue',venue,'publisher-body-popup-schedule'),evidence(sources,key,'entry','100% 현장예약(키오스크)','publisher-body-entry-sentence')])
+        return {'source_id':key,'category':'place','title':'주간 소년 점프\n서울 공식 팝업','subtitle':name+'\n신세계 공식 발표 기준','intro_heading':'기간과 입장부터 확인','intro':period+'\n'+venue+'\n100% 현장예약 · 키오스크','facts':facts,
+          'cta':'팝업 일정 저장\n방문 전 현장 안내 확인','conditions':'상품·특전은 조기 소진될 수 있습니다.\n운영 변경은 신세계 공식 안내 확인','caption':name+' 팝업 소식입니다.\n기간: '+period+'\n장소: '+venue+'\n입장: 100% 현장예약(키오스크)\n상품·특전 재고와 당일 운영 변경은 방문 전 신세계 공식 안내에서 확인하세요.',
+          'image_subject':'A realistic editorial photograph of a fictional manga culture pop-up corridor, bold black and white abstract comic panels, red accents and collectible display plinths, energetic gallery lighting, no recognizable characters, copied artwork, logos, readable text or people. This is not the real venue','_ends':end}
     if url.endswith('/shinsegae-international-popup-service/'):
         required=('텐먼스는오는10월11일까지서울성수동에서첫팝업스토어',
                   '당신만의텐먼스-1:1스타일링클래스','1:1예약제로운영')

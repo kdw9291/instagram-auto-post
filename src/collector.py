@@ -89,6 +89,7 @@ def shinsegae_url(url):
       '/diptyque-les-rituels-de-soin-seongsu-popup-3/':'/diptyque-les-rituels-de-soin-seongsu-popup/',
       '/collection-perfume-launch-3/':'/collection-perfume-launch/',
       '/a-hangawi-cultural-vacation-to-starfield-7/':'/a-hangawi-cultural-vacation-to-starfield/',
+      '/shinsegae-department-store-launches-exclusive-jump-shop-6/':'/shinsegae-department-store-launches-exclusive-jump-shop/',
     }
     if p.path in media_to_article:
         return 'https://www.shinsegaegroupnewsroom.com'+media_to_article[p.path]

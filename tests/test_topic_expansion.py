@@ -44,6 +44,7 @@ class ShinsegaeTests(unittest.TestCase,FixtureMixin):
         self.assertEqual(shinsegae_url(media),'https://www.shinsegaegroupnewsroom.com/diptyque-les-rituels-de-soin-seongsu-popup/')
         self.assertEqual(shinsegae_url('https://www.shinsegaegroupnewsroom.com/collection-perfume-launch-3/'),'https://www.shinsegaegroupnewsroom.com/collection-perfume-launch/')
         self.assertEqual(shinsegae_url('https://www.shinsegaegroupnewsroom.com/a-hangawi-cultural-vacation-to-starfield-7/'),'https://www.shinsegaegroupnewsroom.com/a-hangawi-cultural-vacation-to-starfield/')
+        self.assertEqual(shinsegae_url('https://www.shinsegaegroupnewsroom.com/shinsegae-department-store-launches-exclusive-jump-shop-6/'),'https://www.shinsegaegroupnewsroom.com/shinsegae-department-store-launches-exclusive-jump-shop/')
         bad='텐먼스는 오는 10월 11일까지 서울 성수동에서 첫 팝업스토어. 당신만의 텐먼스 – 1:1 스타일링 클래스 사전예약\n도구 보기\n본문에는 일정이 없습니다. 본문 설명만 길게 채워 두어 요약이 근거가 되지 않게 검사합니다.'
         url='https://www.shinsegaegroupnewsroom.com/shinsegae-international-popup-service/'
         key=self.item(url,'텐먼스, 성수에 팝업 열고 스타일링 서비스 운영','place',bad.split('도구 보기\n',1)[1])
@@ -87,6 +88,18 @@ class ShinsegaeTests(unittest.TestCase,FixtureMixin):
         self.assertIn('한가위',c['title']);self.assertIn('10/1',c['caption'])
         self.assertEqual(len(r['claims']),3)
         with self.assertRaises(EvidenceError):make_release(self.root,key,datetime(2026,10,2,tzinfo=KST))
+
+    def test_generic_popup_schedule_and_kiosk_entry(self):
+        self.at=datetime(2026,9,29,10,tzinfo=KST)
+        url='https://www.shinsegaegroupnewsroom.com/shinsegae-department-store-launches-exclusive-jump-shop/'
+        title='신세계백화점, 주간 소년 점프 공식 팝업 단독 선봬'
+        body='''신세계백화점은 9월 23일부터 오는 10월 6일까지 강남점 센트럴 1층 오픈스테이지에서 「기간한정 JUMP SHOP in SEOUL〈제3탄〉」을 운영한다고 밝혔다.
+이번 팝업에서는 다양한 원작 상품을 선보인다. 고객들은 100% 현장예약(키오스크)을 통해 「점프샵」 팝업을 이용할 수 있다.'''
+        key=self.item(url,title,'place',body,datetime(2026,9,28,tzinfo=KST))
+        c,r=make_release(self.root,key,self.at)
+        self.assertIn('공식 팝업',c['title']);self.assertIn('100% 현장예약',c['caption']);self.assertEqual(len(r['claims']),5)
+        self.write_sources([({'id':key,'url':url,'adapter':'shinsegae-release','headline':title,'category':'place','published':datetime(2026,9,28,tzinfo=KST).isoformat()},title+'\n도구 보기\n'+body.replace('100% 현장예약(키오스크)','온라인 사전예약')+'\n보도자료 다운로드')])
+        with self.assertRaises(EvidenceError):make_release(self.root,key,self.at)
 
 
 class SeoulWeeklyTests(unittest.TestCase,FixtureMixin):

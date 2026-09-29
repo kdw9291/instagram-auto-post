@@ -58,6 +58,25 @@ def rescene_bakery_lineup(article,published):
     return [re.sub(r'(원이|미나미|메이|제나|리브)의',r'\1 ',name) for name in expected],launch
 
 
+def dated_frozen_lineup(article,published):
+    """Parse a three-product frozen-dessert lineup split across two dated sentences."""
+    text=normalize(article)
+    announced=re.search(r'캐릭터3D아이스크림(\d+)종을새롭게선보인다\.',text)
+    first=re.search(r'이달(\d{1,2})일출시하는‘([^‘’]{2,50})’',text)
+    later=re.search(r'이어내달(\d{1,2})일에는‘([^‘’]{2,50})’와‘([^‘’]{2,50})’를추가로출시한다\.',text)
+    if not announced or not first or not later:return None
+    names=[first[2],later[2],later[3]]
+    if int(announced[1])!=len(names) or len(set(names))!=len(names) or not all(('소르베' in name or '아이스크림' in name) for name in names):
+        raise EvidenceError('냉동 디저트 제품 수와 이름을 확인할 수 없습니다.')
+    first_date=datetime(published.year,published.month,int(first[1]),tzinfo=KST)
+    next_month=published.month%12+1;next_year=published.year+(published.month==12)
+    later_date=datetime(next_year,next_month,int(later[1]),tzinfo=KST)
+    if not -1<=(first_date-published).days<=31 or not first_date<later_date<=published+timedelta(days=62):
+        raise EvidenceError('냉동 디저트 출시 일정 범위 확인 필요')
+    names=[re.sub(r'^프로즌(.+?)소르베$',r'프로즌 \1 소르베',name) for name in names]
+    return [{'name':names[0],'launch':first_date},{'name':names[1],'launch':later_date},{'name':names[2],'launch':later_date}]
+
+
 def make_release(root,key,at=None):
     at=at or datetime.now(timezone.utc)
     try:
@@ -107,6 +126,21 @@ def make_release(root,key,at=None):
             c['valid_until']=min(moment(c['valid_until']),published+timedelta(days=7)).isoformat()
             receipt['scope']='BGF 리센느 베이커리 기사에서 5개 제품명과 순차 출시 시작일 대조'
             receipt['omitted_fields']=['가격: 공식 기사에 명시되지 않음','포토카드: 먹거리 정보 중심 편집에서 제외']
+            return c,receipt
+        frozen=dated_frozen_lineup(article,published)
+        if frozen:
+            claims=[evidence(sources,key,'products',[p['name'] for p in frozen],'three-named-frozen-products'),evidence(sources,key,'announced_launch',[p['launch'].date().isoformat() for p in frozen],'two-dated-launch-sentences'),evidence(sources,key,'publication',published.date().isoformat(),'article-header'),evidence(sources,key,'announcement','CU 캐릭터 3D 아이스크림 3종 출시','lineup-announcement-sentence')]
+            lines=[f"{p['launch']:%m/%d} · {p['name']}" for p in frozen]
+            c={'source_id':key,'category':'food','title':'CU 3D 아이스크림\n신제품 3종 일정','subtitle':'포켓몬스터 캐릭터 모양\nBGF 공식 발표 기준',
+               'intro_heading':'두 번에 나눠 출시해요','intro':'\n'.join(lines),
+               'facts':[{'label':'첫 출시 발표','value':lines[0]},{'label':'추가 출시 발표','value':f"{frozen[1]['launch']:%m/%d} · 2종"},{'label':'판매 채널','value':'CU · 매장별 취급·입고 확인'}],
+               'cta':'세 가지 일정 저장\n재고는 매장 확인','conditions':'가격은 공식 기사에 명시되지 않았습니다.\n발표 일정이며 매장별 입고는 다를 수 있습니다.',
+               'caption':'CU 포켓몬스터 캐릭터 3D 아이스크림 3종 출시 소식입니다. BGF가 '+f'{published:%Y.%m.%d} 공개한 공식 자료에서 확인했습니다.\n'+'\n'.join(lines)+'\n가격은 기사에 명시되지 않았습니다. 실제 출시·취급·입고·재고는 매장에서 확인하세요.',
+               'image_subject':'A realistic editorial still life of three abstract frozen sorbet sculptures in purple, mango yellow and orange, frosty texture on plain ceramic plates, playful rounded forms without resembling any copyrighted character, no packaging, logos, writing or people'}
+            c,receipt=finish(c,claims,sources,'bgf-dated-frozen-lineup-v1')
+            c['valid_until']=min(moment(c['valid_until']),published+timedelta(days=7)).isoformat()
+            receipt['scope']='BGF 기사에서 냉동 디저트 3개 제품명과 두 출시 일정 대조'
+            receipt['omitted_fields']=['가격: 공식 기사에 명시되지 않음','캐릭터 외형: 실제 제품 이미지로 재현하지 않음']
             return c,receipt
         scheduled=list(re.finditer(r"(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*출시하는\s*‘([^‘’]{2,60}?)\(\s*([\d,]+)\s*원\s*\)\s*’",' '.join(article.split())))
         launch=None;price=None

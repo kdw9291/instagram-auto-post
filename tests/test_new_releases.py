@@ -94,6 +94,17 @@ class NewReleaseTests(unittest.TestCase):
         self.collect(True)
         with self.assertRaises(EvidenceError):make_release(self.root,'bgf-news-9999')
 
+    def test_three_frozen_products_keep_two_launch_dates(self):
+        self.title='CU, 포켓몬스터 메타몽·피카츄·잉어킹 모양 3D 아이스크림 출시'
+        self.sentence=('CU는 글로벌 인기 캐릭터를 그대로 본뜬 캐릭터 3D 아이스크림 3종을 새롭게 선보인다. '
+          f'먼저, 이달 {self.date.day}일 출시하는 ‘프로즌 메타몽 소르베’는 포도 맛이다. '
+          '이어 내달 14일에는 ‘프로즌 피카츄 소르베’와 ‘프로즌 잉어킹 소르베’를 추가로 출시한다.')
+        self.collect();c,r=make_release(self.root,'bgf-news-9999')
+        self.assertIn('신제품 3종',c['title']);self.assertIn('프로즌 잉어킹 소르베',c['caption'])
+        self.assertIn('가격은 기사에 명시되지 않았습니다',c['caption']);self.assertEqual(len(r['claims']),4)
+        self.sentence=self.sentence.replace('3종을','4종을');self.collect(True)
+        with self.assertRaises(EvidenceError):make_release(self.root,'bgf-news-9999')
+
     def test_paused_category_defers_before_image_creation(self):
         from src.operations import update,DEFAULT
         self.collect();store=Store(self.root)
