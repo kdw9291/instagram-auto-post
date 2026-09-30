@@ -22,6 +22,26 @@ def article_body(text):
 
 def popup_content(key,url,title,article,published,at,sources,claims):
     text=normalize(article)
+    until=re.search(r'오는\s*(\d{1,2})월\s*(\d{1,2})일까지\s*(서울\s+[^\n.]{2,100}?)\s*내에\s*[‘\']([^’\']{2,60})[’\']\s*팝업스토어를\s*운영한다\.',article)
+    if until and '팝업' in title:
+        end=datetime(published.year,int(until[1]),int(until[2]),tzinfo=KST)+timedelta(days=1)
+        venue=' '.join(until[3].split());event=until[4]
+        names=re.findall(r'[‘\']([^’\']{2,60})[’\']',title)
+        if len(names)!=1 or names[0]!=re.sub(r'\([^)]{1,30}\)','',event) or not published<end or at>=end or end-published>timedelta(days=90):
+            raise EvidenceError('팝업 이름·장소·종료일을 확인할 수 없습니다.')
+        price=re.search(r'[‘\']'+re.escape(names[0])+r'[’\']에서는\s*1잔당\s*([\d,]+)원에',article)
+        if price and not 100<=int(price[1].replace(',',''))<=100000:raise EvidenceError('팝업 가격 범위를 확인할 수 없습니다.')
+        date_label=f'{end-timedelta(days=1):%Y.%m.%d}까지'
+        facts=[{'label':'운영 종료','value':date_label},{'label':'진행 장소','value':venue}]
+        if price:facts.append({'label':'스무디 1잔','value':f'{int(price[1].replace(",","")):,}원 · 공식 기사 기준'})
+        claims.extend([evidence(sources,key,'event',names[0],'headline-and-publisher-popup-sentence'),evidence(sources,key,'venue',venue,'publisher-popup-sentence'),evidence(sources,key,'end_date',(end-timedelta(days=1)).date().isoformat(),'publisher-popup-sentence')])
+        if price:claims.append(evidence(sources,key,'cup_price',int(price[1].replace(',','')),'publisher-popup-price-sentence'))
+        is_smoothie='스무디' in title
+        scene=('A realistic editorial photograph of a fictional fruit smoothie customization bar with plain glasses, fresh fruit and colorful toppings, soft daylight, no real product packaging, logos, readable text or people' if is_smoothie else 'A realistic editorial photograph of a fictional pop-up showroom interior, warm natural light, no logos, readable text or identifiable people')
+        return {'source_id':key,'category':'place','title':names[0]+' 팝업\n방문 전 핵심 정보','subtitle':venue+'\n신세계 공식 발표 기준','intro_heading':'장소와 기간부터 확인','intro':date_label+'\n'+venue+('\n1잔당 '+f'{int(price[1].replace(",","")):,}원' if price else ''),'facts':facts,
+          'cta':'팝업 일정 저장\n방문 전 운영 확인','conditions':'운영시간·현장 입장 조건은 공식 안내 확인\n상품과 체험은 현장 상황에 따라 달라질 수 있습니다.',
+          'caption':names[0]+' 팝업 소식입니다.\n운영: '+date_label+'\n장소: '+venue+(f'\n스무디 1잔 가격: {int(price[1].replace(",","")):,}원(공식 기사 기준)' if price else '')+'\n운영시간과 현장 입장·체험 조건은 방문 전 공식 안내에서 확인하세요.',
+          'image_subject':scene+'. This is not the real venue','_ends':end}
     generic=re.search(r'신세계백화점은\s*(\d{1,2})월\s*(\d{1,2})일부터\s*오는\s*(\d{1,2})월\s*(\d{1,2})일까지\s*([^\n.]{2,60}?)에서\s*「([^」]{2,80})」을\s*운영한다고\s*밝혔다\.',article)
     if generic and '팝업' in title:
         start=datetime(published.year,int(generic[1]),int(generic[2]),tzinfo=KST)

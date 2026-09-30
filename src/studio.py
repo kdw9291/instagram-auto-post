@@ -3,6 +3,7 @@ import hashlib
 import json
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from .artifacts import valid_bundle
 from .editorial import verify_content
@@ -33,6 +34,17 @@ class Studio:
             with store.connect() as db:
                 item=db.execute('SELECT source_id FROM items WHERE id=?',(row['item_id'],)).fetchone()
                 if item:db.execute("INSERT OR IGNORE INTO studio_posts(source_id,kind,item_id,version,state,media_id) VALUES(?,'cards',?,?,'published',?)",(item[0],row['item_id'],row['version'],row['media_id']))
+        for filename,kind in [('first-post-published-2026-09-10.json','cards'),('first-reel-published-2026-09-10.json','reel')]:
+            path=store.root/'docs/process'/filename
+            if not path.exists():continue
+            data=json.loads(path.read_text(encoding='utf-8'))
+            if data.get('state')!='published':continue
+            item_id=data.get('item_id') or Path(data.get('path','')).parts[3]
+            with store.connect() as db:
+                item=db.execute('SELECT source_id,version FROM items WHERE id=?',(item_id,)).fetchone()
+                if item:
+                    db.execute('INSERT OR IGNORE INTO studio_posts(source_id,kind,item_id,version,state,media_id,link) VALUES(?,?,?,?,?,?,?)',(item[0],kind,item_id,item[1],'published',data.get('media_id'),data.get('instagram',{}).get('permalink')))
+                    db.execute('UPDATE studio_posts SET link=COALESCE(link,?) WHERE source_id=? AND kind=?',(data.get('instagram',{}).get('permalink'),item[0],kind))
         self.sync_published_items()
 
     def sync_published_items(self):
@@ -159,6 +171,17 @@ class Studio:
             for _ in range(60):
                 self.store.outbox.step(key,api,urls)
                 state=next(j for j in self.store.outbox.rows() if j['id']==key)
+                if state['state']=='uncertain' and state['error']=='게시 응답 확인 필요; 자동 재전송 안 함':
+                    since=datetime.fromisoformat(state['due'])-timedelta(minutes=5)
+                    for _ in range(6):
+                        try:found=api.find_recent(current['content']['caption'],'CAROUSEL_ALBUM',since)
+                        except (OSError,ValueError,KeyError,TypeError):found=None
+                        if found:break
+                        time.sleep(5)
+                    if found:
+                        self.store.outbox.change(key,state='published',media_id=found['id'],error=None)
+                        self.change(source,kind,state='published',media_id=found['id'],link=found['permalink'],error=None)
+                        return
                 if state['state'] in ('published','failed','uncertain','cancelled'):
                     self.change(source,kind,state=state['state'],media_id=state['media_id'],error=state['error']);break
                 time.sleep(5)
@@ -178,7 +201,20 @@ class Studio:
                 time.sleep(5) # ERROR may become FINISHED, observed in the first live Reel.
             else:self.change(source,kind,state='interrupted',error='영상 처리 지연. 상태 확인 필요');return
             self.validate(item['id'],item['version'],sha)
-            self.change(source,kind,state='sending');media=api.publish(container);self.change(source,kind,state='published',media_id=media)
+            self.change(source,kind,state='sending')
+            sent_at=datetime.now(timezone.utc)-timedelta(minutes=5)
+            try:media=api.publish(container)
+            except (OSError,ValueError,KeyError,TypeError):
+                found=None
+                for _ in range(6):
+                    try:found=api.find_recent(current['content']['caption'],'VIDEO',sent_at)
+                    except (OSError,ValueError,KeyError,TypeError):pass
+                    if found:break
+                    time.sleep(5)
+                if not found:
+                    self.change(source,kind,state='uncertain',error='릴스 게시 응답 확인 필요; 자동 재전송 안 함');return
+                self.change(source,kind,state='published',media_id=found['id'],link=found['permalink'],error=None);return
+            self.change(source,kind,state='published',media_id=media)
         if media:
             result=api.transport('GET',media,{'fields':'id,permalink'})
             self.change(source,kind,link=result.get('permalink'))

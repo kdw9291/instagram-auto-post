@@ -65,7 +65,7 @@ class ApgroupNewsTests(unittest.TestCase):
         with self.assertRaises(EvidenceError):make_news(self.root,self.keys[0])
 
     def test_popup_uses_only_one_confirmed_venue_and_period(self):
-        end=self.date+timedelta(days=1)
+        end=self.date
         conflict_start=self.date;conflict_end=end
         self.titles[0]="설화수, 자음생크림 60주년 팝업스토어 'Beauty Crafted in Time' 오픈"
         self.bodies[0]=f"""설화수가 팝업스토어 'Beauty Crafted in Time'을 선보인다.

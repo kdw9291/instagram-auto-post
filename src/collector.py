@@ -83,16 +83,12 @@ def shinsegae_url(url):
     p=urlsplit(url)
     if p.scheme!='https' or p.netloc!='www.shinsegaegroupnewsroom.com' or p.query or p.fragment or not re.fullmatch(r'/[a-z0-9][a-z0-9-]{2,150}/',p.path):
         raise ValueError('지원하지 않는 신세계 뉴스룸 주소')
-    # Some RSS entries point at image-only MEDIA pages. Verify against the
-    # matching full official article instead of treating tag text as evidence.
-    media_to_article={
-      '/diptyque-les-rituels-de-soin-seongsu-popup-3/':'/diptyque-les-rituels-de-soin-seongsu-popup/',
-      '/collection-perfume-launch-3/':'/collection-perfume-launch/',
-      '/a-hangawi-cultural-vacation-to-starfield-7/':'/a-hangawi-cultural-vacation-to-starfield/',
-      '/shinsegae-department-store-launches-exclusive-jump-shop-6/':'/shinsegae-department-store-launches-exclusive-jump-shop/',
-    }
-    if p.path in media_to_article:
-        return 'https://www.shinsegaegroupnewsroom.com'+media_to_article[p.path]
+    # RSS frequently links to image-only MEDIA pages with a one-digit numeric
+    # suffix. Fetch the unsuffixed official article; the editorial adapter
+    # still requires the RSS headline to match and a substantive body.
+    media=re.fullmatch(r'(/[a-z0-9][a-z0-9-]{2,145})-[2-9]/',p.path)
+    if media:
+        return 'https://www.shinsegaegroupnewsroom.com'+media[1]+'/'
     return url
 
 

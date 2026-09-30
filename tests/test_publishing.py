@@ -88,6 +88,19 @@ class PublishingTests(unittest.TestCase):
         self.assertNotIn('publish',api.calls);self.assertEqual(self.box.rows()[0]['state'],'failed')
 
 class InstagramAdapterTests(unittest.TestCase):
+    def test_lost_response_recovery_requires_unique_recent_exact_match(self):
+        from datetime import datetime,timezone
+        from src.instagram_api import InstagramAPI
+        posts=[{'id':'123','caption':'exact caption','media_type':'CAROUSEL_ALBUM','timestamp':'2026-09-30T07:22:09+0000','permalink':'https://www.instagram.com/p/example/'},
+               {'id':'124','caption':'different','media_type':'CAROUSEL_ALBUM','timestamp':'2026-09-30T07:23:09+0000','permalink':'https://www.instagram.com/p/other/'}]
+        api=InstagramAPI('1234','v25.0','test-token','https://images.example',lambda method,path,values:{'data':posts})
+        since=datetime(2026,9,30,7,20,tzinfo=timezone.utc)
+        self.assertEqual(api.find_recent('exact caption','CAROUSEL_ALBUM',since)['id'],'123')
+        self.assertIsNone(api.find_recent('exact caption','VIDEO',since))
+        self.assertIsNone(api.find_recent('exact caption','CAROUSEL_ALBUM',datetime(2026,9,30,7,23,tzinfo=timezone.utc)))
+        posts.append(dict(posts[0],id='125'))
+        self.assertIsNone(api.find_recent('exact caption','CAROUSEL_ALBUM',since))
+
     def test_carousel_request_contract_without_network(self):
         from src.instagram_api import InstagramAPI
         calls=[]

@@ -10,6 +10,49 @@ from .editorial import EvidenceError, KST, load_sources, moment, normalize
 from .products import evidence, finish
 
 
+def labelled_culture_event(sources,key,title,published,text,at):
+    """Use the publisher's event overview labels, excluding adjacent programs."""
+    if not any(word in title for word in ('축제','행사')) or '행사 개요' not in text:return None
+    detail=text.split('행사 개요',1)[1].split('노들섬 축제장 구성도',1)[0]
+    schedule=re.search(r'일시\s*:\s*(20\d{2})\.(\d{1,2})\.(\d{1,2})\.\(([월화수목금토일])\)\s*~\s*(\d{1,2})\.(\d{1,2})\.\(([월화수목금토일])\)\s*(\d{1,2}):(\d{2})\s*~\s*(\d{1,2}):(\d{2})',detail)
+    venue_match=re.search(r'장소\s*:\s*([^\n]+)',detail)
+    program_match=re.search(r'내용\s*:\s*([^\n]+)',detail)
+    if not all((schedule,venue_match,program_match)):raise EvidenceError('행사 개요의 기간·시간·장소·내용 확인 실패')
+    year,month,day=map(int,schedule.groups()[:3]);end_month,end_day=map(int,schedule.groups()[4:6])
+    open_hour,open_minute,close_hour,close_minute=map(int,schedule.groups()[7:])
+    start=datetime(year,month,day,open_hour,open_minute,tzinfo=KST)
+    last=datetime(year,end_month,end_day,close_hour,close_minute,tzinfo=KST)
+    venue=' '.join(venue_match[1].split());program=' '.join(program_match[1].split())
+    if ('월화수목금토일'[start.weekday()]!=schedule[4] or '월화수목금토일'[last.weekday()]!=schedule[7]
+        or not 0<=open_hour<close_hour<=23 or not start<last or last<=at or last-start>timedelta(days=45)
+        or not 2<=len(venue)<=100 or not 2<=len(program)<=120):
+        raise EvidenceError('행사 개요의 일정·장소·내용이 모호합니다.')
+    name=title.split('(',1)[0].strip()
+    if normalize(name) not in normalize(text):raise EvidenceError('행사 제목과 본문이 다릅니다.')
+    words=name.split();split_at=min(range(1,len(words)),key=lambda i:abs(len(' '.join(words[:i]))-len(' '.join(words[i:])))) if len(words)>1 else 1
+    card_title=' '.join(words[:split_at])+'\n'+' '.join(words[split_at:]) if len(words)>1 else name
+    venue_label=venue.split('(',1)[0].strip()
+    period=f'{start:%Y.%m.%d} — {last:%m.%d}'
+    hours=f'{start:%H:%M}–{last:%H:%M}'
+    claims=[evidence(sources,key,'event_title',name,'publisher-heading-and-introduction'),
+      evidence(sources,key,'dates',[start.date().isoformat(),last.date().isoformat()],'publisher-labelled-event-overview'),
+      evidence(sources,key,'daily_hours',hours,'publisher-labelled-event-overview'),
+      evidence(sources,key,'venue',venue,'publisher-labelled-event-overview'),
+      evidence(sources,key,'program',program,'publisher-labelled-event-overview'),
+      evidence(sources,key,'publication',published.date().isoformat(),'homepage-publication')]
+    c={'source_id':key,'category':'place','title':card_title,'subtitle':name+'\n서울시 공식 안내 기준',
+      'intro_heading':'기간과 장소를 확인해요','intro':f'{period}\n매일 {hours}\n{venue_label}',
+      'facts':[{'label':'행사 기간','value':period},{'label':'운영 시간','value':f'매일 {hours}'},{'label':'진행 장소','value':venue_label}],
+      'cta':'가볼 일정 저장\n방문 전 공식 안내 확인','conditions':'입장료·프로그램별 조건은 공식 안내 확인\n당일 운영 변경도 확인하세요.',
+      'caption':f'{name} 소식입니다. 서울시 공식 행사 개요에서 확인했습니다.\n기간: {period}\n시간: 매일 {hours}\n장소: {venue}\n내용: {program}\n입장료와 프로그램별 조건, 당일 운영은 방문 전 공식 안내에서 확인하세요.',
+      'image_subject':'A realistic editorial night photograph of a fictional river island light festival in Seoul, abstract laser beams and luminous media art reflected on water, distant anonymous visitors, no real installations, logos or readable text. This is not the actual event'}
+    c,r=finish(c,claims,sources,'seoul-labelled-culture-event-v1')
+    c['valid_until']=min(moment(c['valid_until']),last).isoformat()
+    c['caption']=c['caption'].replace('직접 사용·시식 후기','직접 방문 후기').replace('실제 제품·발색·단면','실제 행사 현장')
+    r['scope']='서울시 행사 개요의 제목·기간·시간·장소·내용 대조'
+    return c,r
+
+
 def labelled_performance(sources,key,title,published,text,at):
     """Read facts only from the publisher's labelled performance overview, never its AI summary."""
     compact=normalize(text)
@@ -120,6 +163,8 @@ def make_release(root,key,at=None):
         if holiday:return holiday
         performance=labelled_performance(sources,key,title,published,source['text'],at)
         if performance:return performance
+        event=labelled_culture_event(sources,key,title,published,source['text'],at)
+        if event:return event
         if not re.fullmatch(r'20\d{2}서울로미디어캔버스.+전시',normalize(title)):
             raise EvidenceError('이 서울시 전시 형식의 검증 규칙이 필요합니다.')
         period=re.search(r'전시기간:(20\d{2})년(\d{1,2})월(\d{1,2})일~(20\d{2})년(\d{1,2})월(\d{1,2})일',text)

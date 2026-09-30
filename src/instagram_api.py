@@ -2,6 +2,7 @@
 import json
 import re
 import urllib.request
+from datetime import datetime, timezone
 from urllib.parse import urlencode,urlsplit
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -56,6 +57,20 @@ class InstagramAPI:
     def publish(self,container):
         if not str(container).isdigit():raise ValueError('컨테이너 ID 오류')
         return self.transport('POST',self.user_id+'/media_publish',{'creation_id':container})['id']
+
+    def find_recent(self,caption,media_type,since):
+        """Read-only recovery after a lost publish response; never resend media."""
+        if media_type not in ('CAROUSEL_ALBUM','VIDEO') or not isinstance(caption,str) or not caption or since.tzinfo is None:
+            raise ValueError('게시물 대조 조건 오류')
+        result=self.transport('GET',self.user_id+'/media',{'fields':'id,caption,permalink,media_type,timestamp','limit':'25'})
+        matches=[]
+        for row in result.get('data',[]):
+            try:stamp=datetime.fromisoformat(row['timestamp'].replace('Z','+00:00')).astimezone(timezone.utc)
+            except (KeyError,ValueError,TypeError):continue
+            if (row.get('caption')==caption and row.get('media_type')==media_type and stamp>=since.astimezone(timezone.utc)
+                and str(row.get('id','')).isdigit() and str(row.get('permalink','')).startswith('https://www.instagram.com/')):
+                matches.append(row)
+        return matches[0] if len(matches)==1 else None
 
     def profile(self):
         result=self.transport('GET','me',{'fields':'user_id,username'})

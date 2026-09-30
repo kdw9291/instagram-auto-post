@@ -45,6 +45,8 @@ class ShinsegaeTests(unittest.TestCase,FixtureMixin):
         self.assertEqual(shinsegae_url('https://www.shinsegaegroupnewsroom.com/collection-perfume-launch-3/'),'https://www.shinsegaegroupnewsroom.com/collection-perfume-launch/')
         self.assertEqual(shinsegae_url('https://www.shinsegaegroupnewsroom.com/a-hangawi-cultural-vacation-to-starfield-7/'),'https://www.shinsegaegroupnewsroom.com/a-hangawi-cultural-vacation-to-starfield/')
         self.assertEqual(shinsegae_url('https://www.shinsegaegroupnewsroom.com/shinsegae-department-store-launches-exclusive-jump-shop-6/'),'https://www.shinsegaegroupnewsroom.com/shinsegae-department-store-launches-exclusive-jump-shop/')
+        self.assertEqual(shinsegae_url('https://www.shinsegaegroupnewsroom.com/unseen-official-article-4/'),'https://www.shinsegaegroupnewsroom.com/unseen-official-article/')
+        self.assertEqual(shinsegae_url('https://www.shinsegaegroupnewsroom.com/autumn-festival-2026/'),'https://www.shinsegaegroupnewsroom.com/autumn-festival-2026/')
         bad='텐먼스는 오는 10월 11일까지 서울 성수동에서 첫 팝업스토어. 당신만의 텐먼스 – 1:1 스타일링 클래스 사전예약\n도구 보기\n본문에는 일정이 없습니다. 본문 설명만 길게 채워 두어 요약이 근거가 되지 않게 검사합니다.'
         url='https://www.shinsegaegroupnewsroom.com/shinsegae-international-popup-service/'
         key=self.item(url,'텐먼스, 성수에 팝업 열고 스타일링 서비스 운영','place',bad.split('도구 보기\n',1)[1])
@@ -99,6 +101,20 @@ class ShinsegaeTests(unittest.TestCase,FixtureMixin):
         c,r=make_release(self.root,key,self.at)
         self.assertIn('공식 팝업',c['title']);self.assertIn('100% 현장예약',c['caption']);self.assertEqual(len(r['claims']),5)
         self.write_sources([({'id':key,'url':url,'adapter':'shinsegae-release','headline':title,'category':'place','published':datetime(2026,9,28,tzinfo=KST).isoformat()},title+'\n도구 보기\n'+body.replace('100% 현장예약(키오스크)','온라인 사전예약')+'\n보도자료 다운로드')])
+        with self.assertRaises(EvidenceError):make_release(self.root,key,self.at)
+
+    def test_popup_with_end_date_venue_and_optional_price(self):
+        self.at=datetime(2026,9,30,16,tzinfo=KST)
+        url='https://www.shinsegaegroupnewsroom.com/shinsegae-food-opens-instant-fruit-smoothie-pop-up/'
+        title='신세계푸드, 즉석 과일 스무디 팝업 ‘스꾸하우스’ 오픈'
+        body='''신세계푸드는 소비자 접점을 확대하기 위해 오는 10월 28일까지 서울 성수동 노브랜드 버거 성수랩점 내에 ‘스꾸(스무디 꾸미기)하우스’ 팝업스토어를 운영한다.
+‘스꾸하우스’에서는 1잔당 2900원에 스무디 선택부터 토핑 조합, 컵 꾸미기까지 다양한 체험을 즐길 수 있다.'''
+        key=self.item(url,title,'place',body,self.at)
+        content,receipt=make_release(self.root,key,self.at)
+        self.assertIn('노브랜드 버거 성수랩점',content['caption'])
+        self.assertIn('2,900원',content['caption'])
+        self.assertEqual(len(receipt['claims']),5)
+        self.write_sources([({'id':key,'url':url,'adapter':'shinsegae-release','headline':title,'category':'place','published':self.at.isoformat()},title+'\n도구 보기\n'+body.replace('10월 28일까지','10월 28일에')+'\n보도자료 다운로드')])
         with self.assertRaises(EvidenceError):make_release(self.root,key,self.at)
 
 
