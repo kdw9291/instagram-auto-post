@@ -101,8 +101,24 @@ class Studio:
         videos=sum(reel_info(self.store.root,i) is not None for i in ready)
         message=f'새 소재 {new_count}건 · 기존 원고 갱신 {updated}건 · 확인 가능한 카드 {len(ready)}건 / 릴스 {videos}건.'
         if not new_count:message+=' 이번 수집에서 새 제작물로 추가된 소재는 없습니다. 기존 완성본은 제작물 목록에서 확인하세요.'
-        if not ready:message+=' 현재 확인 가능한 완성본이 없습니다. 아래 수집·근거 및 운영 한도 기록을 확인하세요.'
-        self.status={'busy':False,'stage':'done','message':message,'result':{'new':new_count,'updated':updated,'ready':len(ready),'reels':videos}}
+        snapshot=self.store.snapshot()
+        dynamic={s['id']:s for s in snapshot['collection']['sources'] if s.get('adapter') in ('apgroup-release','bgf-release','shinsegae-release','seoul-release')}
+        blocked=[];seen=set();existing={i['source_id'] for i in ready}
+        for event in snapshot['events']:
+            prefix='자동 원고 보완 대기: '
+            if not event['message'].startswith(prefix):continue
+            key,separator,reason=event['message'][len(prefix):].partition(' · ')
+            if not separator or key not in dynamic or key in seen or key in existing:continue
+            seen.add(key);source=dynamic[key]
+            if any(i['source_id']==key and i['state'] in ('published','held') for i in items):continue
+            blocked.append({'source_id':key,'title':source.get('headline',source['name']),'reason':reason})
+        failures=[s['name'] for s in snapshot['collection']['sources'] if s.get('status')!='ok']
+        if not ready:
+            message+=' 현재 확인 가능한 완성본이 없습니다.'
+            if blocked:message+=' 제작 보류: '+' / '.join(b['title']+' — '+b['reason'] for b in blocked[:3])
+            elif failures:message+=' 일부 출처 접근 실패: '+' · '.join(failures[:3])
+            else:message+=' 수집된 후보 중 현재 검증 가능한 새 소재가 없습니다.'
+        self.status={'busy':False,'stage':'done','message':message,'result':{'new':new_count,'updated':updated,'ready':len(ready),'reels':videos,'blocked':blocked,'collection_failed':failures}}
 
 
     def validate(self,item_id,version,sha=None):

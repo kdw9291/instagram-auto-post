@@ -81,7 +81,7 @@ def workflow(prompt,key,config,attempt=1):
     return {
       '1':{'class_type':'CheckpointLoaderSimple','inputs':{'ckpt_name':config['checkpoint']}},
       '2':{'class_type':'CLIPTextEncode','inputs':{'clip':['1',1],'text':prompt}},
-      '3':{'class_type':'CLIPTextEncode','inputs':{'clip':['1',1],'text':'drawing, illustration, cartoon, text, letters, logo, watermark, blurry, deformed'}},
+      '3':{'class_type':'CLIPTextEncode','inputs':{'clip':['1',1],'text':'drawing, illustration, cartoon, text, letters, logo, watermark, blurry, deformed, people, person, human, face, crowd, mannequin, portrait'}},
       '4':{'class_type':'EmptyLatentImage','inputs':{'width':832,'height':1088,'batch_size':1}},
       '5':{'class_type':'KSampler','inputs':{'model':['1',0],'positive':['2',0],'negative':['3',0],'latent_image':['4',0],'seed':int(hashlib.sha256(f'{key}:{attempt}'.encode()).hexdigest()[:12],16),'steps':min(40,max(12,config.get('steps',24))),'cfg':6.5,'sampler_name':'euler','scheduler':'normal','denoise':1}},
       '6':{'class_type':'VAEDecode','inputs':{'samples':['5',0],'vae':['1',2]}},

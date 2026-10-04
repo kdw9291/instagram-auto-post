@@ -117,6 +117,20 @@ class ShinsegaeTests(unittest.TestCase,FixtureMixin):
         self.write_sources([({'id':key,'url':url,'adapter':'shinsegae-release','headline':title,'category':'place','published':self.at.isoformat()},title+'\n도구 보기\n'+body.replace('10월 28일까지','10월 28일에')+'\n보도자료 다운로드')])
         with self.assertRaises(EvidenceError):make_release(self.root,key,self.at)
 
+    def test_generic_store_event_dates_are_kept_separate(self):
+        self.at=datetime(2026,10,4,12,tzinfo=KST)
+        url='https://www.shinsegaegroupnewsroom.com/autumn-events/'
+        title='스타필드 가을 축제'
+        body="스타필드 하남은 10월 3일부터 11일까지 게임과 함께 ‘숲속 파티’를 진행한다.\n스타필드 수원은 10월 2일부터 18일까지 ‘도심 속 밭캉스’를 연다.\n스타필드 고양은 10월 8일부터 18일까지 전시와 함께 ‘펫 전시’를 진행한다."
+        key=self.item(url,title,'place',body,datetime(2026,9,30,tzinfo=KST))
+        content,receipt=make_release(self.root,key,self.at)
+        self.assertIn('3곳',content['title']);self.assertEqual(len(content['facts']),3)
+        self.assertEqual(content['facts'][0]['value'],'2026.10.03 — 10.11')
+        self.assertEqual(content['facts'][1]['value'],'2026.10.02 — 10.18')
+        self.assertNotIn('무료',content['caption']);self.assertEqual(len(receipt['claims']),2)
+        self.write_sources([({'id':key,'url':url,'adapter':'shinsegae-release','headline':title,'category':'place','published':datetime(2026,9,30,tzinfo=KST).isoformat()},title+'\n도구 보기\n'+body+'\n'+body+'\n보도자료 다운로드')])
+        with self.assertRaises(EvidenceError):make_release(self.root,key,self.at)
+
 
 class SeoulWeeklyTests(unittest.TestCase,FixtureMixin):
     def setUp(self):

@@ -20,7 +20,39 @@ def article_body(text):
     return body
 
 
+def store_events(key,title,article,published,at,sources,claims):
+    """Extract several store/date/event sentences without mixing their schedules."""
+    if '스타필드' not in title:return None
+    schedule=[]
+    for match in re.finditer(r'스타필드 ([가-힣]{2,8})은 ([^.\n]+)\.',article):
+        body=match[2]
+        dates=re.findall(r'(\d{1,2})월 (\d{1,2})일부터 (?:(\d{1,2})월 )?(\d{1,2})일까지',body)
+        names=re.findall(r'[‘\']([^’\']{2,70})[’\'](?:를|을) (?:진행한다|연다)',body)
+        if not dates or not names:continue
+        if len(dates)!=1 or len(names)!=1:raise EvidenceError('점포별 행사 이름·일정이 모호합니다.')
+        month,day,end_month,end_day=dates[0]
+        start=datetime(published.year,int(month),int(day),tzinfo=KST)
+        end=datetime(published.year,int(end_month or month),int(end_day),tzinfo=KST)+timedelta(days=1)
+        if not start<end or not -14<=(start-published).days<=90 or end-start>timedelta(days=45):raise EvidenceError('점포별 행사 기간 확인 필요')
+        if end<=at:continue
+        if any(row['venue']=='스타필드 '+match[1] for row in schedule):raise EvidenceError('같은 점포의 일정이 여러 개입니다.')
+        schedule.append({'venue':'스타필드 '+match[1],'event':names[0],'period':f'{start:%Y.%m.%d} — {end-timedelta(days=1):%m.%d}','end':end})
+    if not schedule:return None
+    if len(schedule)<2:raise EvidenceError('묶음으로 확인할 수 있는 점포별 일정이 부족합니다.')
+    selected=schedule[:3]
+    claims.append(evidence(sources,key,'store_schedule',[{k:v for k,v in row.items() if k!='end'} for row in selected],'publisher-store-event-sentences'))
+    label='가을 나들이' if '가을' in title else '행사 소식'
+    return {'source_id':key,'category':'place','title':'스타필드 '+label+'\n점포별 일정 '+str(len(selected))+'곳','subtitle':' · '.join(row['venue'].replace('스타필드 ','') for row in selected)+'\n신세계 공식 발표 기준',
+      'intro_heading':'가까운 점포 일정부터 확인','intro':'\n'.join(row['venue']+' · '+row['event'] for row in selected),
+      'facts':[{'label':row['venue'],'value':row['period']} for row in selected],
+      'cta':'점포별 일정 저장\n방문 전 공식 확인','conditions':'세부 운영시간·입장·체험 조건은\n각 점포 공식 안내에서 확인하세요.',
+      'caption':'스타필드 '+label+'의 공식 일정 '+str(len(selected))+'곳을 정리했습니다.\n'+'\n'.join(row['venue']+': '+row['event']+' · '+row['period'] for row in selected)+'\n운영시간·참가비·예약 및 체험 조건은 방문 전 각 점포 공식 안내를 확인하세요.',
+      'image_subject':'Close-up editorial still-life photograph of abstract autumn balloon decor suspended above an empty ivory display plinth, warm daylight in a fictional shopping exhibition space, harvest colors and subtle architectural background. The space is completely unoccupied: no people, human figures, faces, silhouettes, mannequins or portraits. No game characters, real installations, brands, logos or readable text. Not an actual event photograph','_ends':min(row['end'] for row in selected)}
+
+
 def popup_content(key,url,title,article,published,at,sources,claims):
+    events=store_events(key,title,article,published,at,sources,claims)
+    if events:return events
     text=normalize(article)
     until=re.search(r'오는\s*(\d{1,2})월\s*(\d{1,2})일까지\s*(서울\s+[^\n.]{2,100}?)\s*내에\s*[‘\']([^’\']{2,60})[’\']\s*팝업스토어를\s*운영한다\.',article)
     if until and '팝업' in title:

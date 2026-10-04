@@ -66,6 +66,8 @@ def place(key,title,article,published,sources,claims,at):
     names=re.findall(r"['‘]([^'’]{2,40})['’]",title)
     if len(names)!=1:raise EvidenceError('행사 이름이 모호합니다.')
     name=names[0]
+    if re.search(r'(?:이번|서울) 전시는 \d{1,2}월',article):
+        return dated_exhibition(key,name,article,published,sources,claims,at)
     pattern=r"([가-힣A-Za-z0-9 ·]{2,35})에서 진행되는 ['‘]"+re.escape(name)+r"['’] (?:프로그램|전시|팝업)(?:은|는) (\d{1,2})월 (\d{1,2})일부터 (?:(\d{1,2})월 )?(\d{1,2})일까지 운영된다\."
     m=unique(pattern,article,'장소·운영 기간');venue=m[1].strip()
     start=datetime(published.year,int(m[2]),int(m[3]),tzinfo=KST);end=datetime(published.year,int(m[4] or m[2]),int(m[5]),tzinfo=KST)+timedelta(days=1)
@@ -91,6 +93,24 @@ def place(key,title,article,published,sources,claims,at):
         'facts':[{'label':'진행 장소','value':venue},{'label':'참여 조건','value':condition},{'label':'추가 확인','value':extra}],
         'cta':'방문 전 확인\n참여 조건과 시간','conditions':'운영시간·예약 여부는 공식 안내 확인\n'+extra,'caption':name+' 프로그램 소식입니다.\n장소: '+venue+'\n기간: '+period+'\n참여 조건: '+condition+'\n'+extra+'\n입장료·운영시간·예약 조건은 공식 안내에서 확인하세요.',
         'image_subject':scene+'. Photographic editorial interpretation, not a real venue photograph','_ends':end}
+
+
+def dated_exhibition(key,name,article,published,sources,claims,at):
+    """Read a current domestic exhibition's dates and venue in one sentence."""
+    if not re.search(r"['‘]"+re.escape(name)+r"(?:\([^)]{1,40}\))?['’]",article):raise EvidenceError('전시 이름과 본문 불일치')
+    schedule=unique(r'(?:이번|서울) 전시는 (\d{1,2})월 (\d{1,2})일부터 (?:(\d{1,2})월 )?(\d{1,2})일까지 (서울 [가-힣A-Za-z0-9 ·]{2,55})에서 진행된다\.',article,'국내 전시 장소·운영 기간')
+    start=datetime(published.year,int(schedule[1]),int(schedule[2]),tzinfo=KST)
+    end=datetime(published.year,int(schedule[3] or schedule[1]),int(schedule[4]),tzinfo=KST)+timedelta(days=1)
+    venue=schedule[5].strip()
+    if not start<end or not -14<=(start-published).days<=90 or end<=at or end-start>timedelta(days=90):raise EvidenceError('전시 기간이 모호하거나 종료됐습니다.')
+    period=f'{start:%Y.%m.%d} — {end-timedelta(days=1):%m.%d}'
+    claims.extend([evidence(sources,key,'exhibition',name,'headline-and-exhibition-introduction'),evidence(sources,key,'venue',venue,'same-domestic-exhibition-sentence'),evidence(sources,key,'period',period,'same-domestic-exhibition-sentence')])
+    scene=('Close-up editorial still-life photograph of fictional white flower sculptures on plain ivory plinths, soft botanical shadows on an empty white gallery wall, gentle ivory daylight' if '정원' in article and '꽃' in article else 'Close-up editorial still-life photograph of abstract sculptural forms on plain ivory plinths in an empty contemporary gallery, gentle daylight')
+    return {'source_id':key,'category':'place','title':name+'\n전시 일정과 장소','subtitle':venue+'\n브랜드 공식 발표 기준','intro_heading':'일정과 장소부터 확인','intro':period+'\n'+venue+'\n운영시간·입장 조건은 공식 안내 확인',
+      'facts':[{'label':'전시 기간','value':period},{'label':'진행 장소','value':venue},{'label':'방문 전 확인','value':'운영시간·예약·입장료는 공식 안내 확인'}],
+      'cta':'전시 일정 저장\n방문 전 공식 확인','conditions':'운영시간·예약·입장료는 공식 안내 확인\n작품과 체험은 현장 안내를 따르세요.',
+      'caption':name+' 전시 소식입니다.\n기간: '+period+'\n장소: '+venue+'\n운영시간·예약 여부·입장료는 공식 본문에서 확정하지 않았습니다. 방문 전 전시 공식 안내를 확인하세요.',
+      'image_subject':scene+'. The entire space is unoccupied: no people, human figures, faces, silhouettes, mannequins or portraits. No real artworks, copied installations, logos or readable text. A fictional scene, not the actual exhibition','_ends':end}
 
 
 def popup(key,title,article,published,sources,claims,at):

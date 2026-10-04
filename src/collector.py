@@ -6,6 +6,8 @@ import argparse
 import hashlib
 import json
 import re
+import sqlite3
+from contextlib import closing
 import urllib.request
 import urllib.error
 import urllib.robotparser
@@ -356,6 +358,36 @@ def dynamic_sources(results,at):
     return sources[:5]
 
 
+def retained_official_sources(root,results,previous,at):
+    """Keep unposted official candidates eligible when a rolling feed drops them."""
+    retained=[];seen={s['url'] for s in results};candidates=[]
+    path=Path(root)/'data/runtime/discovery.sqlite3'
+    if path.exists():
+        with closing(sqlite3.connect(path)) as db:
+            db.row_factory=sqlite3.Row
+            candidates=[dict(r) for r in db.execute("SELECT * FROM candidates WHERE source_id IN ('shinsegae-rss','apgroup-discovery','bgf-discovery','seoul-culture-home','seoul-culture-rss') ORDER BY published DESC LIMIT 200")]
+    for candidate in candidates:
+        try:
+            origin=candidate['source_id'];url=candidate['url'];published=candidate['published'];category=candidate['category']
+            if origin=='shinsegae-rss':url=shinsegae_url(url);key='ssg-news-'+hashlib.sha256(url.encode()).hexdigest()[:16];adapter='shinsegae-release'
+            elif origin=='apgroup-discovery':url=apgroup_url(url);key='ap-news-'+urlsplit(url).path.rsplit('/',1)[1][:-5];adapter='apgroup-release'
+            elif origin=='bgf-discovery':url=bgf_url(url);key='bgf-news-'+dict(parse_qsl(urlsplit(url).query))['id'];adapter='bgf-release'
+            else:url=seoul_url(url);key='seoul-culture-'+urlsplit(url).path.rsplit('/',1)[1];adapter='seoul-release'
+            headline=re.sub(r'^보도자료 \d{2}\.\d{2}\.\d{2} ', '',candidate['title'])
+            retained.append({'id':key,'url':url,'kind':'html','name':'저장된 공식 새 소식','category':category,'adapter':adapter,'headline':headline,'published':published})
+        except (ValueError,TypeError,KeyError):continue
+    retained.extend(s for s in previous.get('sources',[]) if s.get('adapter') in ('shinsegae-release','apgroup-release','bgf-release','seoul-release'))
+    selected=[]
+    for source in retained:
+        try:published=datetime.fromisoformat(source['published'])
+        except (ValueError,TypeError,KeyError):continue
+        if published.tzinfo is None or not timedelta(0)<=at-published<timedelta(days=7) or source['url'] in seen:continue
+        if source.get('category') not in ('place','beauty','food') and source.get('adapter')!='bgf-release':continue
+        seen.add(source['url'])
+        selected.append({k:v for k,v in source.items() if k in ('id','url','kind','name','category','adapter','headline','published')})
+    return selected[:12]
+
+
 class Collector:
     def __init__(self,root,transport=request):
         self.root=Path(root);self.transport=transport
@@ -368,8 +400,23 @@ class Collector:
         config=json.loads(self.config.read_text(encoding='utf-8'))
         previous=json.loads(self.report.read_text(encoding='utf-8')) if self.report.exists() else {'sources':[]}
         old={s['id']:s for s in previous['sources']};results=[];robots={}
-        pending=list(config['sources'])
-        for source in pending:
+        pending=list(config['sources']);restored=False;seen=set();completed=set()
+        queue=self.root/'data/runtime/queue.sqlite3'
+        if queue.exists():
+            with closing(sqlite3.connect(queue)) as db:completed={row[0] for row in db.execute("SELECT source_id FROM items WHERE state IN ('published','held')")}
+        while pending or not restored:
+            if not pending:
+                pending=retained_official_sources(self.root,results,previous,utcnow());restored=True
+                if not pending:break
+            source=pending.pop(0)
+            if source['url'] in seen:continue
+            seen.add(source['url'])
+            if source['id'] in completed:
+                # Keep a frozen receipt so the other format can still validate
+                # the same version; never refetch the posted/held article.
+                prior=old.get(source['id'])
+                if prior and prior['url']==source['url']:results.append(prior)
+                continue
             prior=old.get(source['id']);at=utcnow()
             if prior and not force and datetime.fromisoformat(prior['next_check'])>at and all(prior.get(k)==source.get(k) for k in ('url','headline','published')):
                 results.append(prior)

@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
+from unittest.mock import patch
 from PIL import Image
 from src.collector import Collector,apgroup_url,fetch_allowed
 from src.apgroup_releases import make_news
@@ -36,6 +37,48 @@ class ApgroupNewsTests(unittest.TestCase):
         report=self.collect();self.assertEqual(len(report['sources']),3)
         self.collect();self.assertEqual(self.calls.count(self.urls[0]),1)
         self.assertEqual([make_news(self.root,k)[0]['category'] for k in self.keys],['place','beauty'])
+
+    def test_domestic_exhibition_dates_venue_without_inventing_entry_terms(self):
+        end=self.date+timedelta(days=4)
+        self.titles[0]="설화수, 참여형 전시 '시크릿 가든' 선보여"
+        self.bodies[0]=f"설화수가 참여형 전시 '시크릿 가든(Secret Garden)'을 선보인다. 이번 전시는 {self.date.month}월 {self.date.day}일부터 {end.month}월 {end.day}일까지 서울 성수동 어브 스튜디오에서 진행된다.\n지난 전시는 뉴욕에서 열렸다. 정원에는 순백의 꽃이 있다."
+        self.collect();content,receipt=make_news(self.root,self.keys[0])
+        self.assertIn('서울 성수동 어브 스튜디오',content['caption'])
+        self.assertNotIn('뉴욕',content['caption']);self.assertNotIn('무료',content['caption'])
+        self.assertIn('예약 여부',content['caption']);self.assertEqual(len(receipt['claims']),4)
+        original=self.bodies[0]
+        for body in (original.replace('서울 성수동 어브 스튜디오','뉴욕 갤러리'),original+'\n'+original):
+            self.bodies[0]=body;self.collect(True)
+            with self.assertRaises(EvidenceError):make_news(self.root,self.keys[0])
+
+    def test_studio_button_runs_evidence_image_cards_and_reel_pipeline(self):
+        from src.studio import Studio
+        report=self.collect();(self.root/'config/images.json').write_text(json.dumps({'required':True,'provider':'comfyui-local','checkpoint':'test'}))
+        store=Store(self.root);studio=Studio(store)
+        data=io.BytesIO();Image.new('RGB',(832,1088),'gray').save(data,format='PNG')
+        def engine(path,body=None,binary=False):
+            if path.startswith('/object_info'):return {'CheckpointLoaderSimple':{'input':{'required':{'ckpt_name':[['test']]}}}}
+            if path=='/prompt':return {'prompt_id':body['client_id']}
+            if path.startswith('/history/'):
+                job=path.rsplit('/',1)[1]
+                return {job:{'status':{'completed':True},'outputs':{'7':{'images':[{'filename':'one.png','type':'output'}]}}}}
+            return data.getvalue()
+        with patch('src.collector.Collector.run',return_value=report),patch('src.news_images.tick',side_effect=lambda root:tick(root,engine)),patch('src.studio.time.sleep'),patch('src.studio.build_reel') as reels:
+            studio.produce()
+        items=store.snapshot()['items'];self.assertEqual(len(items),2)
+        self.assertTrue(all(item['state']=='waiting' for item in items))
+        self.assertTrue(all((self.root/'assets/images/generated'/item['id']/item['version']/'card-1.png').exists() for item in items))
+        self.assertEqual(studio.status['result']['new'],2);self.assertEqual(reels.call_count,2)
+        self.assertEqual(studio.posts(),[])
+
+    def test_zero_result_explains_current_editorial_block(self):
+        from src.studio import Studio
+        self.urls=self.urls[:1];self.titles=["설화수, '새 정원' 전시"];self.bodies=['기간과 장소가 확정되지 않은 전시 소식입니다.']
+        report=self.collect();studio=Studio(Store(self.root))
+        with patch('src.collector.Collector.run',return_value=report):studio.produce()
+        self.assertEqual(studio.status['result']['new'],0)
+        self.assertEqual(studio.status['result']['blocked'][0]['title'],self.titles[0])
+        self.assertIn('제작 보류',studio.status['message'])
     def test_beauty_never_copies_efficacy_or_unverified_price(self):
         self.collect();c,r=make_news(self.root,self.keys[1])
         self.assertIn('새 버블 클렌저',c['caption'])
