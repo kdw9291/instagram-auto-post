@@ -96,6 +96,28 @@ class ApgroupNewsTests(unittest.TestCase):
         self.bodies[1]=self.bodies[1].replace('출시했다','출시하지 않았다');self.collect(True)
         self.assertEqual(next(c for c in sync(self.root,report) if c['source_id']=='rss')['state'],'discovered')
 
+    def test_renewal_launch_mask_supported_without_copying_efficacy(self):
+        self.titles[1]="설화수, 모공·피지 케어 강화한 '옥용팩' 리뉴얼 출시"
+        self.bodies[1]="홀리스틱 뷰티를 추구하는 글로벌 럭셔리 뷰티 브랜드 설화수가 대표 필오프 마스크 '옥용팩'을 리뉴얼 출시했다. 이번 리뉴얼을 통해 모공 속 노폐물과 피지 케어 효능을 강화했다."
+        self.collect();content,receipt=make_news(self.root,self.keys[1])
+        self.assertIn('옥용팩 리뉴얼 출시',content['caption'])
+        self.assertNotIn('신제품',content['caption']);self.assertNotIn('피지 케어 효능',content['caption'])
+        self.assertIn('마스크팩',content['title']);self.assertIn('gel',content['image_subject'])
+        self.assertEqual(len(receipt['claims']),3)
+        original=self.bodies[1]
+        for body in (original.replace('리뉴얼 출시했다','리뉴얼 출시하지 않았다'), original+'\n'+original, original.replace('옥용팩','다른 팩'), original.replace('설화수가','다른 브랜드가')):
+            self.bodies[1]=body;self.collect(True)
+            with self.assertRaises(EvidenceError):make_news(self.root,self.keys[1])
+
+    def test_other_launch_types_use_neutral_visual_and_keep_renewal_distinct(self):
+        self.titles[1]="일리윤, '새 토너' 출시"
+        self.bodies[1]="일리윤이 '새 토너'를 출시했다."
+        self.collect();content,_=make_news(self.root,self.keys[1])
+        self.assertIn('새 토너',content['caption']);self.assertIn('뷰티 제품',content['title'])
+        self.assertIn('no identifiable product',content['image_subject'])
+        self.bodies[1]="일리윤이 '새 토너'를 리뉴얼 출시했다.";self.collect(True)
+        with self.assertRaises(EvidenceError):make_news(self.root,self.keys[1])
+
     def test_exhibition_explicit_reservation_and_ambiguity(self):
         end=self.date+timedelta(days=3)
         self.titles[0]="설화수, '새로운 빛' 전시"

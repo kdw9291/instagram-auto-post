@@ -40,23 +40,34 @@ def make_news(root,key,at=None):
 def beauty(key,title,article,published,sources,claims):
     brand=title.split(',',1)[0]
     if not re.fullmatch(r'[가-힣]{2,8}',brand) or brand not in article:raise EvidenceError('브랜드 식별 불일치')
-    m=unique(r"(?:첫 제품으로|신제품) ['‘]([^'’]{2,40})['’](?:를|을) (?:선보였다|출시했다)\.",article,'제품 출시 문장')
-    name=m[1]
+    pattern=r"['‘]([^'’]{2,40})['’](?:를|을) ((?:리뉴얼 |리뉴얼해 |리뉴얼하여 |새롭게 )?출시했다|선보였다)\."
+    launches=list(re.finditer(pattern,article))
+    if len(launches)!=1:raise EvidenceError('제품 출시 문장: 근거가 없거나 여러 값이 있습니다.')
+    m=launches[0];name=m[1];renewal=m[2].startswith('리뉴얼')
+    sentence=article[max(article.rfind('.',0,m.start()),article.rfind('\n',0,m.start()))+1:m.end()]
+    if brand not in sentence:raise EvidenceError('제품 출시 문장에 브랜드 근거가 없습니다.')
+    headline_names=re.findall(r"['‘]([^'’]{2,40})['’]",title)
+    if headline_names and headline_names!=[name]:raise EvidenceError('기사 제목과 출시 제품이 다릅니다.')
+    if ('리뉴얼' in title)!=renewal:raise EvidenceError('기사 제목과 신제품·리뉴얼 구분이 다릅니다.')
     scenes=[(('클렌저','클렌징','팩폼'),'클렌저','Extreme macro photograph of airy white cleansing foam and clear water bubbles on frosted glass, soft clean daylight, only foam and water'),(('크림','세럼'),'스킨케어','Extreme macro photograph of creamy white emulsion spread on frosted glass, soft ivory light, only cream texture'),(('틴트','립스틱'),'립 제품','Extreme macro photograph of ruby red glossy gel pigment on glass, luminous shine, only gel texture')]
     choice=next(((label,scene) for words,label,scene in scenes if any(w in name for w in words)),None)
-    if not choice:raise EvidenceError('제품 이미지 장면 규칙 없음')
+    if not choice and any(w in name+' '+sentence for w in ('팩','마스크')):
+        choice=('마스크팩','Extreme macro photograph of translucent golden cosmetic gel spread on frosted glass, soft ivory daylight, only gel texture and glass')
+    if not choice:
+        choice=('뷰티 제품','Editorial still-life photograph of translucent cosmetic gel and white emulsion on frosted glass, soft ivory daylight, abstract texture only, no identifiable product')
     label,scene=choice
     channel='공식 판매처 확인'
     if '병의원 판매' in title:
         if not re.search(re.escape(name)+r"['’]는[^.\n]*국내 병의원에서 만나볼 수 있다\.",article):raise EvidenceError('판매 채널 문장 없음')
         channel='병의원 판매 · 취급 문의'
-    claims.extend([evidence(sources,key,'brand',brand,'headline-brand'),evidence(sources,key,'product',name,'first-product-launch-sentence')])
+    claims.extend([evidence(sources,key,'brand',brand,'headline-brand'),evidence(sources,key,'product',name,'affirmative-product-launch-sentence')])
     if channel!='공식 판매처 확인':claims.append(evidence(sources,key,'channel',channel,'product-sales-sentence'))
-    return {'source_id':key,'category':'beauty','title':brand+' 새 '+label+'\n공식 출시 소식','subtitle':name+'\n브랜드 공식 발표 기준',
-        'intro_heading':'새 제품 소식','intro':name+f'\n{published:%Y.%m.%d} 공식 발표\n제품 사용 후기는 아닙니다.',
+    announcement='리뉴얼 출시' if renewal else '출시'
+    return {'source_id':key,'category':'beauty','title':brand+' '+label+'\n'+announcement+' 소식','subtitle':name+'\n브랜드 공식 발표 기준',
+        'intro_heading':'리뉴얼 소식' if renewal else '새 제품 소식','intro':name+f'\n{published:%Y.%m.%d} 공식 발표\n제품 사용 후기는 아닙니다.',
         'facts':[{'label':'공식 발표일','value':f'{published:%Y.%m.%d}'},{'label':'판매 안내','value':channel},{'label':'구매 전 확인','value':'가격·재고·사용 안내는 판매처 확인'}],
         'cta':'제품 소식 저장\n판매처에서 확인','conditions':'개인별 사용 적합성을 판단하지 않습니다.\n효능·안전성을 보증하는 후기가 아닙니다.',
-        'caption':f'{brand}의 {name} 출시 소식입니다. {published:%Y.%m.%d} 공식 자료에서 신제품 발표를 확인했습니다.\n판매 안내: {channel}. 가격·재고·사용 안내는 판매처에서 확인하세요. 효능·개인별 적합성에 대한 판단은 포함하지 않았습니다.',
+        'caption':f'{brand}의 {name} {announcement} 소식입니다. {published:%Y.%m.%d} 브랜드 공식 발표를 확인했습니다.\n판매 안내: {channel}. 가격·재고·사용 안내는 판매처에서 확인하세요. 효능·개인별 적합성에 대한 판단은 포함하지 않았습니다.',
         'image_subject':scene+'. Editorial visual inspired by a new beauty product, no packaging or writing'}
 
 
