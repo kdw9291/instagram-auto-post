@@ -67,6 +67,17 @@ class NewReleaseTests(unittest.TestCase):
         self.sentence+=' '+self.sentence;self.collect(True)
         with self.assertRaises(EvidenceError):make_release(self.root,'bgf-news-9999')
 
+    def test_named_dated_product_after_launch_verb(self):
+        self.title='CU, 김밥축제 우승작 ‘중화식 고추잡채 김밥’ 출시'
+        original=f"CU가 이달 {self.date.day}일 출시하는 상품은 경연 대회 우승작을 재현한 ‘중화식 고추잡채 김밥’(3,600원)이다. 다른 김밥은 9,900원이다."
+        self.sentence=original;self.collect();content,receipt=make_release(self.root,'bgf-news-9999')
+        self.assertIn('중화식 고추잡채 김밥',content['caption']);self.assertIn('3,600원',content['caption'])
+        self.assertIn('gimbap',content['image_subject'])
+        self.assertNotIn('9,900',content['caption']);self.assertEqual(len(receipt['claims']),5)
+        for body in (original+original,original.replace('출시하는','출시하지 않는'),original.replace('중화식 고추잡채 김밥','다른 김밥'),original.replace('CU가','타사가')):
+            self.sentence=body;self.collect(True)
+            with self.assertRaises(EvidenceError):make_release(self.root,'bgf-news-9999')
+
     def test_student_recipe_article_keeps_only_two_named_products(self):
         self.title='CU, 한국조리과학고 학생들의 레시피로 만든 간편식 출시!'
         first_day=self.date.day;second_day=min(first_day+2,28)

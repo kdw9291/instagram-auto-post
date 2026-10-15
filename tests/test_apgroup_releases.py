@@ -118,6 +118,16 @@ class ApgroupNewsTests(unittest.TestCase):
         self.bodies[1]="일리윤이 '새 토너'를 리뉴얼 출시했다.";self.collect(True)
         with self.assertRaises(EvidenceError):make_news(self.root,self.keys[1])
 
+    def test_new_brand_present_tense_launch_keeps_medical_claims_out(self):
+        from src.collector import apgroup_category
+        self.titles[1]='아이오페, 어드밴스드덤 프로 리페어링 밴디지 크림 출시'
+        self.bodies[1]="스킨케어 브랜드 아이오페가 신제품 '어드밴스드덤 프로 리페어링 밴디지 크림'을 출시한다. 사용 1일 후 붉은기가 48.6% 개선됐다."
+        self.collect();content,_=make_news(self.root,self.keys[1])
+        self.assertIn('아이오페',content['title']);self.assertNotIn('48.6',content['caption'])
+        self.assertIsNone(apgroup_category("설화수, 궁중문화축전 전시 성료"))
+        self.bodies[1]=self.bodies[1].replace('출시한다','출시하지 않는다');self.collect(True)
+        with self.assertRaises(EvidenceError):make_news(self.root,self.keys[1])
+
     def test_exhibition_explicit_reservation_and_ambiguity(self):
         end=self.date+timedelta(days=3)
         self.titles[0]="설화수, '새로운 빛' 전시"

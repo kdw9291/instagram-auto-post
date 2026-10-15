@@ -119,7 +119,36 @@ def popup_content(key,url,title,article,published,at,sources,claims):
         'image_subject':scene+'. Editorial interpretation, not an actual venue photograph','_ends':end}
 
 
+def dessert_lineup(key,article,published,sources,claims):
+    """Cross-check a publisher's dated product table against named prices."""
+    text=normalize(article)
+    announced=re.findall(r'이마트24가[^.]{0,100}신상품([2-6])종을이달순차적으로선보인다\.',text)
+    if len(announced)!=1 or article.count('상품 및 출시일자')!=1:raise EvidenceError('디저트 제품 수·출시 표 확인 필요')
+    table=article.split('상품 및 출시일자',1)[1].split('한편',1)[0]
+    matches=re.findall(r'([^(),\n]{2,40})\((\d{1,2})/(\d{1,2})\)',table)
+    if len(matches)!=int(announced[0]):raise EvidenceError('디저트 제품 수와 출시 일정 불일치')
+    products=[]
+    for raw_name,month,day in matches:
+        name=raw_name.strip()
+        if not any(word in name for word in ('빵','쿠키','산도','케이크')):raise EvidenceError('디저트 유형 확인 필요')
+        prices=re.findall(r'‘'+re.escape(name)+r'\(([\d,]+)원\)’',article)
+        if len(prices)!=1 or not 0<int(prices[0].replace(',',''))<100000:raise EvidenceError('디저트별 가격 근거 확인 필요')
+        launch=datetime(published.year,int(month),int(day),tzinfo=KST)
+        if not -31<=(launch-published).days<=60:raise EvidenceError('디저트 출시일 범위 확인 필요')
+        if any(p['name']==name for p in products):raise EvidenceError('디저트 출시 표 제품 중복')
+        products.append({'name':name,'date':launch.date().isoformat(),'price':int(prices[0].replace(',',''))})
+    claims.extend([evidence(sources,key,'products',products,'publisher-product-date-table-and-named-prices'),evidence(sources,key,'channel','이마트24','publisher-lineup-announcement')])
+    lines=[p['date'][5:].replace('-','/')+' · '+p['name'] for p in products]
+    return {'source_id':key,'category':'food','title':f'이마트24 신상 디저트\n{len(products)}종 출시 일정','subtitle':'제품별 날짜·가격 정리\n신세계 공식 발표 기준',
+        'intro_heading':'제품마다 출시일이 달라요','intro':'\n'.join(lines[:2]),
+        'facts':[{'label':'추가 출시 일정','value':'\n'.join(lines[2:])},{'label':'발표 가격','value':f"{min(p['price'] for p in products):,}~{max(p['price'] for p in products):,}원"},{'label':'구매 전 확인','value':'매장별 입고·재고·결제금액 확인'}],
+        'cta':'출시 일정 저장\n재고는 매장 확인','conditions':'발표 일정이며 실제 입고는 다를 수 있습니다.\n할인·쿠폰 조건은 공식 안내를 확인하세요.',
+        'caption':f'이마트24 신상 디저트 {len(products)}종 소식입니다. {published:%Y.%m.%d} 공식 발표 기준입니다.\n'+'\n'.join(p['date']+' · '+p['name']+f" · {p['price']:,}원" for p in products)+'\n발표 일정·가격이며 매장별 취급·입고·재고·결제금액은 판매처에서 확인하세요. 직접 시식한 후기는 아닙니다.',
+        'image_subject':'Photorealistic editorial still life of fictional cream breads, chocolate sandwich and thick cookies on plain ceramic plates, warm cafe daylight, appetizing baked textures, no branded packaging, logos, readable text or people'}
+
+
 def food_content(key,title,article,published,sources,claims):
+    if '이마트24' in title and '출시' in title:return dessert_lineup(key,article,published,sources,claims)
     text=normalize(article)
     names=re.findall(r'[‘“]([^’”]{2,45})[’”]',title)
     if '스타벅스' not in title or '출시' not in title or len(names)!=1:

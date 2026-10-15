@@ -12,7 +12,8 @@ SCENES=[
     (('빵','베이커리','베이글'), 'Fresh fictional bakery bread on parchment, warm window light, appetizing baked texture'),
     (('쿠키','과자'), 'Fictional cookies and crackers on a ceramic plate, crisp baked texture, warm cafe light'),
     (('아이스크림','젤라또'), 'Fictional ice cream scoops in a plain ceramic bowl, soft creamy texture, cool studio light'),
-    (('도시락','김밥'), 'Fictional Korean rice lunch and vegetable side dishes in a plain lunch box, natural daylight'),
+    (('김밥',), 'Photorealistic close-up food photograph of fictional Korean gimbap, sliced seaweed wrapped rice rolls with visible colorful vegetable fillings, arranged on a plain ceramic plate, soft natural daylight, only rice rolls and plate, not a compartment lunch box'),
+    (('도시락',), 'Fictional Korean rice lunch and vegetable side dishes in a plain lunch box, natural daylight'),
     (('라면','우동'), 'Fictional steaming noodle soup in a plain ceramic bowl, appetizing noodles, soft side light'),
     (('커피','라테'), 'Fictional iced coffee in a plain clear glass, realistic condensation, soft cafe window light'),
 ]
@@ -144,7 +145,17 @@ def make_release(root,key,at=None):
             return c,receipt
         scheduled=list(re.finditer(r"(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*출시하는\s*‘([^‘’]{2,60}?)\(\s*([\d,]+)\s*원\s*\)\s*’",' '.join(article.split())))
         launch=None;price=None
-        if scheduled:
+        dated_named=list(re.finditer(r"CU(?:가|는)(이달|오는\d{1,2}월|\d{1,2}월)(\d{1,2})일출시하는(?:상품|제품)은[^.‘’]{0,60}‘([^‘’]{2,60})’\(([\d,]+)원\)이다\.",normalize(article)))
+        if dated_named:
+            if scheduled or len(dated_named)!=1:raise EvidenceError('한 원고에 담을 출시 제품이 여러 개입니다.')
+            m=dated_named[0];name=m[3];price=int(m[4].replace(',',''))
+            month=published.month if m[1]=='이달' else int(re.search(r'\d+',m[1])[0])
+            launch=datetime(published.year,month,int(m[2]),tzinfo=KST)
+            if not 0<price<100000 or not 0<=(launch-published).days<=60:raise EvidenceError('출시 일정·가격 범위 확인 필요')
+            title_names=re.findall(r'[‘“「]([^’”」]{2,60})[’”」]',title)
+            if len(title_names)!=1 or normalize(title_names[0])!=name:raise EvidenceError('제목과 날짜·가격 문장의 제품 불일치')
+            name=title_names[0]
+        elif scheduled:
             if len(scheduled)!=1:raise EvidenceError('한 원고에 담을 출시 제품이 여러 개입니다.')
             m=scheduled[0];name=m[3].strip();price=int(m[4].replace(',',''))
             launch=datetime(published.year,int(m[1]),int(m[2]),tzinfo=KST)

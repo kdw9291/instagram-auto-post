@@ -61,6 +61,20 @@ class ShinsegaeTests(unittest.TestCase,FixtureMixin):
         key=self.item(star,'스타벅스, ‘카스텔라 고구마 라떼’ 출시','food','스타벅스 코리아가 카스텔라 고구마 라떼를 오는 15일부터 전국 스타벅스 매장에서 선보인다. 가을 신제품을 소개하는 공식 발표 본문이며 판매 여부는 매장에서 확인한다.')
         c,_=make_release(self.root,key,self.at);self.assertIn('카스텔라 고구마 라떼',c['title'])
 
+    def test_emart24_dessert_table_dates_prices_and_ambiguity(self):
+        self.at=datetime(2026,10,15,10,tzinfo=KST)
+        title='이마트24, 신상품 4종 출시!'
+        url='https://www.shinsegaegroupnewsroom.com/emart24-dessert-launch/'
+        published=datetime(2026,10,14,tzinfo=KST)
+        body="이마트24가 협업을 통해 차별화 신상품 4종을 이달 순차적으로 선보인다.\n‘초코크림빵(3,800원)’과 ‘밤크림빵(3,800원)’, ‘초코산도(3,600원)’, ‘고구마쿠키(2,900원)’를 소개한다.\n분류\n상품 및 출시일자\n빵·디저트\n초코크림빵(10/3), 초코산도(10/3)\n밤크림빵(10/17)\n쿠키\n고구마쿠키(10/16)\n한편 할인은 조건을 확인한다."
+        key=self.item(url,title,'food',body,published)
+        content,_=make_release(self.root,key,self.at)
+        self.assertIn('2026-10-17 · 밤크림빵 · 3,800원',content['caption'])
+        self.assertNotIn('30%',content['caption'])
+        for altered in (body.replace('신상품 4종','신상품 5종'),body.replace('밤크림빵(10/17)','없는빵(10/17)'),body.replace('10/17','13/17'),body.replace('신상품 4종을 이달 순차적으로 선보인다','신상품 4종을 출시하지 않는다')):
+            self.item(url,title,'food',altered,published)
+            with self.assertRaises(EvidenceError):make_release(self.root,key,self.at)
+
     def test_loewe_five_perfumes(self):
         self.at=datetime(2026,9,22,10,tzinfo=KST)
         url='https://www.shinsegaegroupnewsroom.com/collection-perfume-launch/'

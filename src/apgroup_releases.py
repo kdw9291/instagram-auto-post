@@ -40,7 +40,7 @@ def make_news(root,key,at=None):
 def beauty(key,title,article,published,sources,claims):
     brand=title.split(',',1)[0]
     if not re.fullmatch(r'[가-힣]{2,8}',brand) or brand not in article:raise EvidenceError('브랜드 식별 불일치')
-    pattern=r"['‘]([^'’]{2,40})['’](?:를|을) ((?:리뉴얼 |리뉴얼해 |리뉴얼하여 |새롭게 )?출시했다|선보였다)\."
+    pattern=r"['‘]([^'’]{2,40})['’](?:를|을) ((?:리뉴얼 |리뉴얼해 |리뉴얼하여 |새롭게 )?출시(?:했다|한다)|선보였다)\."
     launches=list(re.finditer(pattern,article))
     if len(launches)!=1:raise EvidenceError('제품 출시 문장: 근거가 없거나 여러 값이 있습니다.')
     m=launches[0];name=m[1];renewal=m[2].startswith('리뉴얼')
