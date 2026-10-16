@@ -92,6 +92,26 @@ class NewReleaseTests(unittest.TestCase):
         self.collect(True)
         with self.assertRaises(EvidenceError):make_release(self.root,'bgf-news-9999')
 
+    def test_sales_headline_requires_one_current_body_launch(self):
+        from src.collector import classify
+        self.title='아침 식사 시장 잡아라! CU, 꼬마김밥 400만 개 판매!'
+        original=f"CU는 이달 {self.date.day}일 ‘참치 리챔 반반 꼬마김밥’(3,400원)을 추가로 출시해 라인업을 강화해 나간다. 기존 상품은 400만 개 팔렸다."
+        self.sentence=original;self.collect();content,_=make_release(self.root,'bgf-news-9999')
+        self.assertEqual(classify(self.title),'food');self.assertIn('3,400원',content['caption'])
+        self.assertNotIn('400만',content['caption']);self.assertNotIn('예정',content['intro'])
+        self.sentence='요약: ‘참치 리챔 반반 꼬마김밥’ 출시. '+original;self.collect(True)
+        self.assertIn('3,400원',make_release(self.root,'bgf-news-9999')[0]['caption'])
+        for body in (original+original,original.replace('출시해','출시하지 않아'),'지난 상품은 많이 팔렸다.'):
+            self.sentence=body;self.collect(True)
+            with self.assertRaises(EvidenceError):make_release(self.root,'bgf-news-9999')
+
+    def test_candy_body_date_and_price_inside_quotes(self):
+        self.title='편의점은 K-POP 무대! CU, 앨범부터 노래캔디까지 판매'
+        self.sentence=f"CU는 오는 {self.date.day}일 음악이 들리는 상품 ‘노래캔디(5,000원)’ 3탄을 출시한다. 기존 상품은 인기가 있었다."
+        self.collect();content,_=make_release(self.root,'bgf-news-9999')
+        self.assertIn('노래캔디',content['caption']);self.assertIn('5,000원',content['caption'])
+        self.assertIn('lollipops',content['image_subject']);self.assertNotIn('앨범',content['caption'])
+
     def test_rescene_bakery_article_keeps_five_named_products(self):
         self.title='리센느 취향 담았다! CU, BAKE405 리센느 빵 5종 출시'
         self.sentence=(f'CU는 브랜드 모델 리센느와 협업해 BAKE405 차별화 베이커리 5종을 이달 {self.date.day}일부터 순차적으로 선보인다. '

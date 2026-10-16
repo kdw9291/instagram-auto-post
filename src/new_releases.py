@@ -9,6 +9,7 @@ from .editorial import EvidenceError, load_sources, moment, normalize, KST
 from .products import finish, evidence
 
 SCENES=[
+    (('캔디',), 'Photorealistic editorial still life of fictional colorful lollipops on a plain ceramic tray, glossy candy texture, soft studio daylight, no branded packaging, electronics, logos or text'),
     (('빵','베이커리','베이글'), 'Fresh fictional bakery bread on parchment, warm window light, appetizing baked texture'),
     (('쿠키','과자'), 'Fictional cookies and crackers on a ceramic plate, crisp baked texture, warm cafe light'),
     (('아이스크림','젤라또'), 'Fictional ice cream scoops in a plain ceramic bowl, soft creamy texture, cool studio light'),
@@ -78,6 +79,21 @@ def dated_frozen_lineup(article,published):
     return [{'name':names[0],'launch':first_date},{'name':names[1],'launch':later_date},{'name':names[2],'launch':later_date}]
 
 
+def dated_body_announcement(article,published):
+    """A sales story is eligible only with one dated, priced affirmative launch."""
+    pattern=r"CU(?:는|가)(이달|오는)(\d{1,2})일[^.‘’]{0,80}‘([^‘’()]{2,60})(?:\(([\d,]+)원\)’|’\(([\d,]+)원\))(?:[1-9]탄)?(?:을|를)(?:추가로)?(?:출시한다\.|출시해[^.]{1,80}\.)"
+    matches=list(re.finditer(pattern,normalize(article)))
+    if not matches:return None
+    if len(matches)!=1:raise EvidenceError('날짜·가격이 명시된 출시 문장이 여러 개입니다.')
+    m=matches[0];price=int((m[4] or m[5]).replace(',',''))
+    launch=datetime(published.year,published.month,int(m[2]),tzinfo=KST)
+    if not 0<price<100000 or not -31<=(launch-published).days<=31:raise EvidenceError('본문 출시일·가격 범위 확인 필요')
+    names=[n.split('(',1)[0].strip() for n in re.findall(r'‘([^‘’]{2,100})’', ' '.join(article.split())) if normalize(n.split('(',1)[0])==m[3]]
+    names=list(dict.fromkeys(names))
+    if len(names)!=1:raise EvidenceError('본문 출시 제품명이 모호합니다.')
+    return names[0],launch,price
+
+
 def make_release(root,key,at=None):
     at=at or datetime.now(timezone.utc)
     try:
@@ -94,7 +110,8 @@ def make_release(root,key,at=None):
         article=body.split(header,1)[1].split('\n이전글',1)[0]
         if any(w in title for w in ('맥주','소주','와인','주류','음주','담배','건강기능','치료','선물세트','생활소품')):
             raise EvidenceError('현재 자동 출시 편집 범위 밖')
-        if 'CU' not in title or '출시' not in title:raise EvidenceError('CU 출시 발표 제목이 필요합니다.')
+        body_launch=dated_body_announcement(article,published)
+        if 'CU' not in title or ('출시' not in title and not body_launch):raise EvidenceError('CU 출시 발표 제목 또는 날짜·가격이 확인된 본문이 필요합니다.')
         lineup=student_meal_lineup(article,published)
         if lineup:
             products,price=lineup;name=' · '.join(p['name'] for p in products);launch=None
@@ -146,7 +163,10 @@ def make_release(root,key,at=None):
         scheduled=list(re.finditer(r"(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*출시하는\s*‘([^‘’]{2,60}?)\(\s*([\d,]+)\s*원\s*\)\s*’",' '.join(article.split())))
         launch=None;price=None
         dated_named=list(re.finditer(r"CU(?:가|는)(이달|오는\d{1,2}월|\d{1,2}월)(\d{1,2})일출시하는(?:상품|제품)은[^.‘’]{0,60}‘([^‘’]{2,60})’\(([\d,]+)원\)이다\.",normalize(article)))
-        if dated_named:
+        if body_launch:
+            if scheduled or dated_named:raise EvidenceError('한 원고에 담을 출시 제품이 여러 개입니다.')
+            name,launch,price=body_launch
+        elif dated_named:
             if scheduled or len(dated_named)!=1:raise EvidenceError('한 원고에 담을 출시 제품이 여러 개입니다.')
             m=dated_named[0];name=m[3];price=int(m[4].replace(',',''))
             month=published.month if m[1]=='이달' else int(re.search(r'\d+',m[1])[0])
@@ -178,9 +198,9 @@ def make_release(root,key,at=None):
         if launch:
             claims += [evidence(sources,key,'announced_launch',launch.date().isoformat(),'dated-product-sentence'),evidence(sources,key,'announced_price',price,'same-product-parentheses')]
             c.update(title=f'CU 신상 먹거리\n{launch:%m/%d} 출시 발표',subtitle=name+'\nBGF 공식 발표 기준',
-                     intro=name+f'\n{launch:%Y.%m.%d} 출시 예정 발표\n실제 입고·재고는 매장에서 확인',
-                     facts=[{'label':'제품 발표 가격','value':f'{price:,}원'},{'label':'출시 예정일 발표','value':f'{launch:%Y.%m.%d}'},{'label':'판매 채널','value':'CU · 매장별 취급·재고 확인'}],
-                     caption=f'CU의 {name} 소식입니다. BGF가 {published:%Y.%m.%d} 공개한 자료에서 {launch:%Y.%m.%d} 출시 예정, {price:,}원으로 발표했습니다.\n발표 일정과 가격이며 실제 입고·재고·결제금액은 매장에서 확인하세요.')
+                     intro=name+f'\n{launch:%Y.%m.%d} 출시일 발표\n실제 입고·재고는 매장에서 확인',
+                     facts=[{'label':'제품 발표 가격','value':f'{price:,}원'},{'label':'발표 출시일','value':f'{launch:%Y.%m.%d}'},{'label':'판매 채널','value':'CU · 매장별 취급·재고 확인'}],
+                     caption=f'CU의 {name} 소식입니다. BGF가 {published:%Y.%m.%d} 공개한 자료에서 출시일 {launch:%Y.%m.%d}, 가격 {price:,}원으로 발표했습니다.\n발표 일정과 가격이며 실제 입고·재고·결제금액은 매장에서 확인하세요.')
         c,receipt=finish(c,claims,sources,'bgf-new-release-v1')
         c['valid_until']=min(moment(c['valid_until']),published+timedelta(days=7)).isoformat()
         receipt['scope']='BGF 제목·발표일·본문 출시 문장 규칙 대조'

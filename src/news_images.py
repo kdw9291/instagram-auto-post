@@ -156,7 +156,11 @@ def tick(root,transport=call):
             info=transport('/object_info/CheckpointLoaderSimple')
             names=info['CheckpointLoaderSimple']['input']['required']['ckpt_name'][0]
             if config['checkpoint'] not in names:raise ValueError('로컬 생성 모델 설치 대기')
-        except (OSError,ValueError,KeyError) as e:
+        except OSError as e:
+            # No generation request has been sent: a cold engine can be retried safely.
+            with db:db.execute('UPDATE jobs SET error=?,next_try=? WHERE id=?',(str(e)[:150],time.time()+5,key))
+            return
+        except (ValueError,KeyError) as e:
             with db:db.execute('UPDATE jobs SET error=?,next_try=? WHERE id=?',(str(e)[:150],time.time()+300,key))
             return
         with db:

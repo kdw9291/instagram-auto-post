@@ -67,6 +67,17 @@ class NewsImageTests(unittest.TestCase):
         tick(self.root,lambda *a,**k:{'CheckpointLoaderSimple':{'input':{'required':{'ckpt_name':[[]]}}}})
         with self.assertRaises(ImagePending):attach(self.root,self.content)
 
+    def test_cold_engine_retry_does_not_submit_or_consume_attempt(self):
+        from unittest.mock import patch
+        from src.news_images import connect
+        self.queue();calls=[]
+        def offline(path,body=None,binary=False):
+            calls.append(path);raise OSError('connection refused')
+        with patch('src.news_images.time.time',return_value=1000):tick(self.root,offline)
+        db=connect(self.root);job=dict(db.execute('SELECT * FROM jobs').fetchone());db.close()
+        self.assertEqual(job['state'],'queued');self.assertEqual(job['attempts'],0)
+        self.assertEqual(job['next_try'],1005);self.assertNotIn('/prompt',calls)
+
     def test_confirmed_failure_retries_with_limit_but_not_uncertain(self):
         from src.news_images import connect
         from src.operations import update, DEFAULT
