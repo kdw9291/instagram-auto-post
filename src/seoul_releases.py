@@ -153,6 +153,9 @@ def make_release(root,key,at=None):
         report=json.loads((Path(root)/'data/runtime/collection/report.json').read_text(encoding='utf-8'))
         entry=next(s for s in report['sources'] if s['id']==key and s.get('adapter')=='seoul-release')
         url=seoul_url(entry['url']);article_id=url.rsplit('/',1)[1]
+        if key.startswith('seoul-mediahub-'):
+            from .seoul_mediahub import make_mediahub
+            return make_mediahub(root,entry,at)
         if key!='seoul-culture-'+article_id:raise EvidenceError('서울시 기사 식별자 불일치')
         sources=load_sources(root,at,{key:url});source=sources[key]
         title=entry['headline'];published=moment(entry['published'])
@@ -201,4 +204,4 @@ def make_release(root,key,at=None):
 def adapters(root):
     try:report=json.loads((Path(root)/'data/runtime/collection/report.json').read_text(encoding='utf-8'))
     except (OSError,ValueError):return []
-    return [(s['id'],partial(make_release,key=s['id'])) for s in report.get('sources',[]) if s.get('adapter')=='seoul-release' and re.fullmatch(r'seoul-culture-[1-9][0-9]{0,9}',s.get('id',''))]
+    return [(s['id'],partial(make_release,key=s['id'])) for s in report.get('sources',[]) if s.get('adapter')=='seoul-release' and re.fullmatch(r'seoul-(?:culture|mediahub)-[1-9][0-9]{0,9}',s.get('id',''))]

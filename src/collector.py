@@ -96,9 +96,15 @@ def shinsegae_url(url):
 
 def seoul_url(url):
     p=urlsplit(url)
+    if p.scheme=='https' and p.netloc=='mediahub.seoul.go.kr' and not p.query and not p.fragment and re.fullmatch(r'/archives/[1-9][0-9]{0,9}',p.path):return url
     if p.scheme!='https' or p.netloc!='news.seoul.go.kr' or p.query or p.fragment or not re.fullmatch(r'/culture/archives/[1-9][0-9]{0,9}',p.path):
         raise ValueError('지원하지 않는 서울시 문화 기사 주소')
     return url
+
+
+def seoul_key(url):
+    url=seoul_url(url)
+    return ('seoul-mediahub-' if urlsplit(url).netloc=='mediahub.seoul.go.kr' else 'seoul-culture-')+url.rsplit('/',1)[1]
 
 
 def apgroup_category(title):
@@ -167,7 +173,7 @@ def seoul_sources(results,at):
             try:url=seoul_url(c['url']);date=parsedate_to_datetime(c['published_at'])
             except (ValueError,TypeError,KeyError):continue
             if c.get('category')!='place' or date.tzinfo is None or not timedelta(0)<=at-date<timedelta(days=7) or url in seen:continue
-            seen.add(url);key='seoul-culture-'+urlsplit(url).path.rsplit('/',1)[1]
+            seen.add(url);key=seoul_key(url)
             sources.append({'id':key,'url':url,'kind':'html','name':'서울시 새 문화·전시 소식','category':'place','adapter':'seoul-release','headline':c['title'],'published':date.isoformat()})
     return sources[:8]
 
@@ -372,13 +378,17 @@ def retained_official_sources(root,results,previous,at):
             if origin=='shinsegae-rss':url=shinsegae_url(url);key='ssg-news-'+hashlib.sha256(url.encode()).hexdigest()[:16];adapter='shinsegae-release'
             elif origin=='apgroup-discovery':url=apgroup_url(url);key='ap-news-'+urlsplit(url).path.rsplit('/',1)[1][:-5];adapter='apgroup-release'
             elif origin=='bgf-discovery':url=bgf_url(url);key='bgf-news-'+dict(parse_qsl(urlsplit(url).query))['id'];adapter='bgf-release'
-            else:url=seoul_url(url);key='seoul-culture-'+urlsplit(url).path.rsplit('/',1)[1];adapter='seoul-release'
+            else:url=seoul_url(url);key=seoul_key(url);adapter='seoul-release'
             headline=re.sub(r'^보도자료 \d{2}\.\d{2}\.\d{2} ', '',candidate['title'])
             retained.append({'id':key,'url':url,'kind':'html','name':'저장된 공식 새 소식','category':category,'adapter':adapter,'headline':headline,'published':published})
         except (ValueError,TypeError,KeyError):continue
     retained.extend(s for s in previous.get('sources',[]) if s.get('adapter') in ('shinsegae-release','apgroup-release','bgf-release','seoul-release'))
     selected=[]
     for source in retained:
+        if source.get('adapter')=='seoul-release':
+            try:
+                if seoul_key(source['url'])!=source['id']:continue
+            except (ValueError,KeyError):continue
         try:published=datetime.fromisoformat(source['published'])
         except (ValueError,TypeError,KeyError):continue
         if published.tzinfo is None or not timedelta(0)<=at-published<timedelta(days=7) or source['url'] in seen:continue
