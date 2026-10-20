@@ -101,6 +101,19 @@ class ShinsegaeTests(unittest.TestCase,FixtureMixin):
             self.item(url,title,'food',altered)
             with self.assertRaises(EvidenceError):make_release(self.root,key,self.at)
 
+    def test_archive_exhibition_public_only_on_last_day(self):
+        self.at=datetime(2026,10,20,12,tzinfo=KST)
+        title='브랜드 아카이브 전시 진행'
+        body="브랜드는 아카이브 전시 ‘레이어스 오브 타임’을 진행한다고 밝혔다. 이번 전시는 오는 22일까지 주요 백화점 바이어와 패션업계 관계자, VIP 고객 등을 대상으로 진행한다. 전시 마지막 날인 23일에는 일반 소비자에게도 공개한다.\n[전시 정보]\n– 기간: 10/16(금) ~ 10/23(금)\n– 시간: 오전 10시 ~ 오후 6시\n– 장소: 서울시 강남구 압구정로60길 17"
+        url='https://www.shinsegaegroupnewsroom.com/archive-exhibition/'
+        published=datetime(2026,10,19,tzinfo=KST);key=self.item(url,title,'place',body,published)
+        c,r=make_release(self.root,key,self.at)
+        self.assertIn('10/23 하루',c['title']);self.assertIn('VIP',c['caption']);self.assertNotIn('무료',c['caption'])
+        self.assertEqual(len(r['claims']),5)
+        for altered in (body+body,body.replace('23일에는','22일에는'),body.replace('10/23(금)','10/23(목)'),body.replace('일반 소비자에게도 공개한다','온라인으로만 공개한다')):
+            self.item(url,title,'place',altered,published)
+            with self.assertRaises(EvidenceError):make_release(self.root,key,self.at)
+
     def test_starfield_hangawi_schedule(self):
         self.at=datetime(2026,9,22,10,tzinfo=KST)
         url='https://www.shinsegaegroupnewsroom.com/a-hangawi-cultural-vacation-to-starfield/'

@@ -128,6 +128,16 @@ class ApgroupNewsTests(unittest.TestCase):
         self.bodies[1]=self.bodies[1].replace('출시한다','출시하지 않는다');self.collect(True)
         with self.assertRaises(EvidenceError):make_news(self.root,self.keys[1])
 
+    def test_two_lip_products_share_verified_retail_date(self):
+        self.titles[1]="마몽드, '크리미 틴트 컬러 밤' 출시 10주년 맞아 새롭게 선보여"
+        self.bodies[1]=f"마몽드가 립 제품을 선보인다. 마몽드 '크리미 틴트 컬러 밤'과 '크리미 틴트 프렙 밤'은 {self.date.month}월 {self.date.day}일부터 올리브영에서 만나볼 수 있다."
+        self.collect();c,r=make_news(self.root,self.keys[1])
+        self.assertIn('프렙 밤',c['caption']);self.assertIn('올리브영',c['caption']);self.assertEqual(len(r['claims']),5)
+        original=self.bodies[1]
+        for body in (original+original,original.replace('만나볼 수 있다','만나볼 수 없다'),original.replace('컬러 밤','다른 밤')):
+            self.bodies[1]=body;self.collect(True)
+            with self.assertRaises(EvidenceError):make_news(self.root,self.keys[1])
+
     def test_exhibition_explicit_reservation_and_ambiguity(self):
         end=self.date+timedelta(days=3)
         self.titles[0]="설화수, '새로운 빛' 전시"

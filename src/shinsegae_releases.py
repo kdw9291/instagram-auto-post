@@ -51,6 +51,25 @@ def store_events(key,title,article,published,at,sources,claims):
 
 
 def popup_content(key,url,title,article,published,at,sources,claims):
+    if '아카이브 전시' in title and '일반 소비자에게도 공개한다.' in article:
+        name=re.findall(r"아카이브 전시 [‘']([^’']{2,80})[’'](?:을|를) 진행한다고",article)
+        dates=re.findall(r'기간:\s*(\d{1,2})/(\d{1,2})\(([월화수목금토일])\)\s*~\s*(\d{1,2})/(\d{1,2})\(([월화수목금토일])\)',article)
+        hours=re.findall(r'시간:\s*오전 (\d{1,2})시\s*~\s*오후 (\d{1,2})시',article)
+        venues=re.findall(r'장소:\s*([^\n]{2,80})',article)
+        public=re.findall(r'전시 마지막 날인 (\d{1,2})일에는 일반 소비자에게도 공개한다\.',article)
+        private=re.findall(r'이번 전시는 오는 (\d{1,2})일까지 주요 백화점 바이어와 패션업계 관계자, VIP 고객 등을 대상으로 진행한다\.',article)
+        if not all(len(v)==1 for v in (name,dates,hours,venues,public,private)):raise EvidenceError('전시 기간·일반 공개 조건이 모호합니다.')
+        month,day,weekday,endmonth,endday,endweekday=dates[0];opening,closing=map(int,hours[0])
+        start=datetime(published.year,int(month),int(day),tzinfo=KST)
+        visit=datetime(published.year,int(endmonth),int(endday),opening,tzinfo=KST);end=visit.replace(hour=closing+12)
+        if not start<=visit<end or end<=at or not -14<=(start-published).days<=60 or end-published>timedelta(days=90) or not 1<=opening<=11 or not 1<=closing<=11 or int(public[0])!=visit.day or int(private[0])!=visit.day-1 or '월화수목금토일'[start.weekday()]!=weekday or '월화수목금토일'[visit.weekday()]!=endweekday:raise EvidenceError('전시 일반 공개일·시간 관계 확인 필요')
+        venue=venues[0].strip();event=name[0];label=f'{visit:%Y.%m.%d} 하루 · {visit:%H:%M}–{end:%H:%M}'
+        claims.extend([evidence(sources,key,'exhibition',event,'archive-exhibition-introduction'),evidence(sources,key,'public_visit',label,'last-day-public-disclosure-and-labelled-hours'),evidence(sources,key,'venue',venue,'labelled-exhibition-address'),evidence(sources,key,'restricted_days','일반 공개 전날까지 관계자·VIP 대상','explicit-private-audience-sentence')])
+        return {'source_id':key,'category':'place','title':'청담 아카이브 전시\n'+f'{visit:%m/%d} 하루 일반 공개','subtitle':event+'\n브랜드 공식 안내 기준','intro_heading':'공개일을 꼭 구분하세요','intro':label+'\n'+venue+'\n이전 일정은 관계자·VIP 대상',
+          'facts':[{'label':'일반 관람 안내','value':label},{'label':'전시 장소','value':venue},{'label':'방문 전 확인','value':'입장료·예약·당일 운영은 별도 확인'}],
+          'cta':'하루 공개 일정 저장\n방문 전 공식 확인','conditions':'일반 공개 전 일정은 관계자·VIP 대상입니다.\n입장료·예약·이벤트 조건은 별도 확인하세요.',
+          'caption':event+' 전시 안내입니다.\n일반 소비자 공개: '+label+'\n장소: '+venue+'\n이전 일정은 관계자·VIP 대상으로 안내됐습니다. 일반 공개일을 구분해 방문하세요. 입장료·예약·당일 운영·이벤트 조건은 브랜드 공식 안내에서 확인하세요.',
+          'image_subject':'Photorealistic editorial still life of layered ivory organza fabric swatches and simple sewing pattern paper on a plain atelier table, warm gallery spotlights, tactile textile textures, no copied garment designs, mannequins, people, logos or readable text. A conceptual fashion archive scene, not the actual exhibition','_ends':end}
     events=store_events(key,title,article,published,at,sources,claims)
     if events:return events
     text=normalize(article)

@@ -40,6 +40,19 @@ def make_news(root,key,at=None):
 def beauty(key,title,article,published,sources,claims):
     brand=title.split(',',1)[0]
     if not re.fullmatch(r'[가-힣]{2,8}',brand) or brand not in article:raise EvidenceError('브랜드 식별 불일치')
+    retail=re.findall(re.escape(brand)+r" ['‘]([^'’]{2,40})['’](?:과|와) ['‘]([^'’]{2,40})['’](?:은|는) (\d{1,2})월 (\d{1,2})일부터 ([가-힣A-Za-z0-9 ]{2,25})에서 만나볼 수 있다\.",article)
+    if retail:
+        if len(retail)!=1:raise EvidenceError('두 제품 판매 일정이 모호합니다.')
+        main,companion,month,day,channel=retail[0]
+        if main==companion or re.findall(r"['‘]([^'’]{2,40})['’]",title)!=[main] or not all('틴트' in n and '밤' in n for n in (main,companion)):raise EvidenceError('제목·판매 제품·제품 유형 불일치')
+        launch=datetime(published.year,int(month),int(day),tzinfo=KST)
+        if not -7<=(launch-published).days<=60:raise EvidenceError('판매 시작일 관계 확인 필요')
+        claims.extend([evidence(sources,key,'brand',brand,'headline-brand'),evidence(sources,key,'products',[main,companion],'same-brand-two-product-retail-sentence'),evidence(sources,key,'retail_date',launch.date().isoformat(),'same-retail-sentence-date'),evidence(sources,key,'channel',channel,'same-retail-sentence-channel')])
+        return {'source_id':key,'category':'beauty','title':brand+' 립 제품 2종\n판매 일정 한눈에','subtitle':main+'\n'+companion,'intro_heading':'두 제품을 함께 확인해요','intro':main+'\n'+companion+f'\n{launch:%m/%d}부터 · '+channel,
+          'facts':[{'label':'판매 시작 발표','value':f'{launch:%Y.%m.%d}'},{'label':'판매 채널','value':channel},{'label':'구매 전 확인','value':'가격·재고·색상은 판매처 확인'}],
+          'cta':'립 제품 소식 저장\n발색·재고는 판매처 확인','conditions':'직접 사용하거나 발색한 후기가 아닙니다.\n효능·사용 적합성을 보증하지 않습니다.',
+          'caption':brand+' 립 제품 소식입니다.\n'+main+'\n'+companion+f'\n{published:%Y.%m.%d} 공식 자료에서 {launch:%Y.%m.%d}부터 '+channel+' 판매 안내를 확인했습니다. 가격·재고·색상은 판매처에서 확인하세요. 직접 사용·발색 후기나 효능 판단은 포함하지 않았습니다.',
+          'image_subject':'Extreme macro editorial photograph of two creamy lipstick pigment strokes in muted rose and ruby red on frosted glass, soft ivory daylight, frame filled only by abstract cosmetic textures, no packaging, product containers, lips, faces, logos or writing'}
     pattern=r"['‘]([^'’]{2,40})['’](?:를|을) ((?:리뉴얼 |리뉴얼해 |리뉴얼하여 |새롭게 )?출시(?:했다|한다)|선보였다)\."
     launches=list(re.finditer(pattern,article))
     if len(launches)!=1:raise EvidenceError('제품 출시 문장: 근거가 없거나 여러 값이 있습니다.')

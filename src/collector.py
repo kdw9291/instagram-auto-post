@@ -110,7 +110,7 @@ def seoul_key(url):
 def apgroup_category(title):
     if any(w in title for w in ('선물','기획 세트','모집','연구회','대상 수상','성료')):return None
     if any(w in title for w in ('전시','팝업','시간 여행')):return 'place'
-    if '출시' in title and any(w in title for w in ('일리윤','라네즈','헤라','설화수','프리메라','에스트라','이니스프리','아이오페','한율','해피바스','라보에이치')):return 'beauty'
+    if '출시' in title and any(w in title for w in ('일리윤','라네즈','헤라','설화수','프리메라','에스트라','이니스프리','아이오페','한율','해피바스','라보에이치','틴트','립스틱','립밤','립 밤','선크림','파운데이션','쿠션','세럼','크림')):return 'beauty'
     return None
 
 
