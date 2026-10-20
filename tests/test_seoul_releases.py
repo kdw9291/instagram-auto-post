@@ -38,6 +38,17 @@ class SeoulReleaseTests(unittest.TestCase):
         content,receipt=make_release(self.root,self.key,self.at)
         self.assertIn('미디어아트',content['title']);self.assertIn('총 24점',content['caption']);self.assertEqual(len(receipt['claims']),5)
 
+    def test_labelled_exhibition_cross_year_dates_and_no_inferred_fees(self):
+        self.at=datetime(2026,10,20,12,tzinfo=KST)
+        title='린 허쉬만 리슨: 나의 [나]들 전시 안내'
+        body=title+'\nAI 요약\n전시 무료\n서울시립미술관은 《린 허쉬만 리슨: 나의 [나]들》을 개최합니다.\n전시 기간\n2026. 10. 21.(수) - 2027. 2. 21.(일)\n전시 장소\n서울시립미술관 서소문본관, 2–3층\nAI생성태그'
+        published=datetime(2026,10,19,tzinfo=KST)
+        self.write_source(body,title,'535023',published);c,r=make_release(self.root,self.key,self.at)
+        self.assertIn('2027.02.21',c['caption']);self.assertNotIn('무료',c['caption']);self.assertEqual(len(r['claims']),4)
+        for altered in (body+body,body.replace('21.(수)','21.(목)'),body.replace('개최합니다','개최하지 않습니다')):
+            self.write_source(altered,title,'535023',published)
+            with self.assertRaises(EvidenceError):make_release(self.root,self.key,self.at)
+
     def test_work_count_mismatch_is_blocked(self):
         self.write_source('2026 서울로미디어캔버스 세 번째 전시\n전시 기간 : 2026년 9월 21일~2026년 11월 30일\n전시 시간 : 19시~23시\n전시 작품 : 신진예술가 지원공모전 20작품, 네이처 프로젝트전 4작품 (총25점)')
         with self.assertRaises(EvidenceError):make_release(self.root,self.key,self.at)

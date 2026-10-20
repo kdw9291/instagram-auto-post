@@ -90,6 +90,17 @@ class ShinsegaeTests(unittest.TestCase,FixtureMixin):
         self.write_sources([({'id':key,'url':url,'adapter':'shinsegae-release','headline':title,'category':'beauty','published':published.isoformat()},title+'\n도구 보기\n'+body.replace('버던트 그로브 EDP','버던트 EDP')+'\n보도자료 다운로드')])
         with self.assertRaises(EvidenceError):make_release(self.root,key,self.at)
 
+    def test_food_collaboration_counted_price_list_without_inventing_dates(self):
+        title='이마트24, ‘재혼 황후’ 콜라보 상품 출시'
+        body='이마트24는 ‘재혼 황후’와 협업해 간편식과 디저트 등 총 4종의 상품을 이달 선보입니다.\n머쉬룸크림파스타(4,300원), 에그샌드위치(4,200원)을 시작으로, 로얄밀크티원컵(2,000원), 초코도넛(2,400원)을 출시한다.'
+        url='https://www.shinsegaegroupnewsroom.com/emart24-food-collaboration/'
+        key=self.item(url,title,'food',body);c,r=make_release(self.root,key,self.at)
+        self.assertIn('4종',c['title']);self.assertIn('2,000~4,300원',c['facts'][1]['value'])
+        self.assertIn('정확한 출시일은 확정하지 않았습니다',c['caption']);self.assertEqual(len(r['claims']),3)
+        for altered in (body.replace('총 4종','총 5종'),body+body,body.replace('선보입니다','선보이지 않습니다')):
+            self.item(url,title,'food',altered)
+            with self.assertRaises(EvidenceError):make_release(self.root,key,self.at)
+
     def test_starfield_hangawi_schedule(self):
         self.at=datetime(2026,9,22,10,tzinfo=KST)
         url='https://www.shinsegaegroupnewsroom.com/a-hangawi-cultural-vacation-to-starfield/'

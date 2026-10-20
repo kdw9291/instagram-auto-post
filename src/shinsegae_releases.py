@@ -147,7 +147,31 @@ def dessert_lineup(key,article,published,sources,claims):
         'image_subject':'Photorealistic editorial still life of fictional cream breads, chocolate sandwich and thick cookies on plain ceramic plates, warm cafe daylight, appetizing baked textures, no branded packaging, logos, readable text or people'}
 
 
+def collaboration_menu(key,title,article,published,sources,claims):
+    """Named food/price lists are distinct from individually dated product tables."""
+    text=normalize(article)
+    count=re.findall(r'총([2-9])종의상품을이달선보입니다\.',text)
+    if len(count)!=1:raise EvidenceError('협업 상품 수·공식 출시 문장 확인 필요')
+    partner=re.findall(r'‘([^’]{2,40})’와\s*협업해',article)
+    if len(partner)!=1 or partner[0] not in title:raise EvidenceError('협업 이름과 제목 대조 실패')
+    lines=[line for line in article.splitlines() if re.search(r'\([\d,]+원\)',line) and line.endswith('출시한다.')]
+    if len(lines)!=1:raise EvidenceError('상품별 가격이 있는 출시 목록이 모호합니다.')
+    products=re.findall(r'(?:^|,\s*|을 시작으로,\s*)([^,()]{2,50})\(([\d,]+)원\)',lines[0])
+    if len(products)!=int(count[0]) or len({p[0].strip() for p in products})!=len(products):raise EvidenceError('공식 상품 수와 가격 목록 불일치')
+    products=[{'name':n.strip(),'price':int(p.replace(',',''))} for n,p in products]
+    allowed=('파스타','샌드위치','밀크티','도넛','모찌롤','마카롱','케익','케이크','쿠키','빵')
+    if any(not any(w in p['name'] for w in allowed) or not 0<p['price']<100000 for p in products):raise EvidenceError('먹거리 유형·가격 범위 확인 필요')
+    claims.extend([evidence(sources,key,'collaboration',partner[0],'same-brand-collaboration-introduction'),evidence(sources,key,'products',products,'count-matched-food-price-launch-list')])
+    low=min(p['price'] for p in products);high=max(p['price'] for p in products)
+    return {'source_id':key,'category':'food','title':f'이마트24 협업 먹거리\n{len(products)}종 한눈에','subtitle':partner[0]+' 컬래버레이션\n공식 발표 기준','intro_heading':'간편식부터 디저트까지','intro':'\n'.join(p['name'] for p in products[:3])+'\n외 '+str(len(products)-3)+'종',
+      'facts':[{'label':'공식 발표 구성','value':f'간편식·디저트 등 {len(products)}종'},{'label':'발표 가격 범위','value':f'{low:,}~{high:,}원'},{'label':'구매 전 확인','value':'제품별 출시일·입고·재고는 매장 확인'}],
+      'cta':'먹거리 목록 저장\n입고는 매장에서 확인','conditions':'개별 출시일은 기사에 명시되지 않았습니다.\n할인·굿즈·팝업 조건은 별도 확인하세요.',
+      'caption':f'이마트24 {partner[0]} 협업 먹거리 {len(products)}종 소식입니다.\n'+f'{published:%Y.%m.%d} 공식 발표의 제품명과 가격입니다.\n'+'\n'.join(p['name']+f" · {p['price']:,}원" for p in products)+'\n제품별 정확한 출시일은 확정하지 않았습니다. 매장별 취급·입고·재고·결제금액은 판매처에서 확인하세요. 직접 시식한 후기는 아닙니다.',
+      'image_subject':'Photorealistic editorial food still life of fictional creamy mushroom pasta, egg sandwich, milk tea and small assorted pastries on a clean ivory cafe table, warm natural window light, no characters, illustrations, branded packaging, logos, readable text or people. A conceptual scene, not the actual collaboration products'}
+
+
 def food_content(key,title,article,published,sources,claims):
+    if '이마트24' in title and '협업해' in article and '상품을 이달 선보입니다.' in article:return collaboration_menu(key,title,article,published,sources,claims)
     if '이마트24' in title and '출시' in title:return dessert_lineup(key,article,published,sources,claims)
     text=normalize(article)
     names=re.findall(r'[‘“]([^’”]{2,45})[’”]',title)

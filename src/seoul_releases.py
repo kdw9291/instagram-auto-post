@@ -6,7 +6,7 @@ from functools import partial
 from pathlib import Path
 
 from .collector import seoul_url
-from .editorial import EvidenceError, KST, load_sources, moment, normalize
+from .editorial import EvidenceError, KST, load_sources, moment, normalize, unique
 from .products import evidence, finish
 
 
@@ -147,6 +147,30 @@ def holiday_event(sources,key,title,published,text,at):
     return c,r
 
 
+def labelled_exhibition(sources,key,title,published,text,at):
+    if '\n전시 기간\n' not in text or '\n전시 장소\n' not in text:return None
+    # The factual overview follows the original prose, outside the AI summary.
+    name=unique(r'《([^》]{2,70})》을 개최합니다\.',text,'전시 개최 문장')[1]
+    if normalize(name) not in normalize(title):raise EvidenceError('전시 이름과 제목 불일치')
+    schedule=unique(r'\n전시 기간\n(20\d{2})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\(([월화수목금토일])\)\s*-\s*(20\d{2})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\(([월화수목금토일])\)',text,'전시 기간')
+    start=datetime(*map(int,(schedule[1],schedule[2],schedule[3])),tzinfo=KST)
+    last=datetime(*map(int,(schedule[5],schedule[6],schedule[7])),tzinfo=KST);end=last+timedelta(days=1)
+    if not start<end or end<=at or end-start>timedelta(days=370) or not -60<=(start-published).days<=90 or '월화수목금토일'[start.weekday()]!=schedule[4] or '월화수목금토일'[last.weekday()]!=schedule[8]:raise EvidenceError('전시 기간·요일 관계 확인 필요')
+    venue=' '.join(unique(r'\n전시 장소\n([^\n]{2,90})',text,'전시 장소')[1].split()).replace('–','~')
+    period=f'{start:%Y.%m.%d} — {last:%Y.%m.%d}'
+    claims=[evidence(sources,key,'exhibition',name,'affirmative-exhibition-introduction'),evidence(sources,key,'period',period,'labelled-period-and-weekdays'),evidence(sources,key,'venue',venue,'labelled-exhibition-venue'),evidence(sources,key,'publication',published.date().isoformat(),'official-list-publication')]
+    heading=name.replace(': ','\n',1)
+    c={'source_id':key,'category':'place','title':heading,'subtitle':'새 전시 일정·장소\n서울시 공식 안내 기준','intro_heading':'관람 전 확인해요','intro':period+'\n'+venue+'\n운영시간·입장료·휴관일은 별도 확인',
+       'facts':[{'label':'전시 기간','value':period},{'label':'전시 장소','value':venue},{'label':'방문 전 확인','value':'운영시간·입장료·예약·휴관일'}],
+       'cta':'전시 일정 저장\n관람 조건은 공식 확인','conditions':'운영시간·입장료·휴관일은 별도 확인\n예약 및 당일 운영은 미술관 공지를 따르세요.',
+       'caption':name+' 전시 안내입니다.\n기간: '+period+'\n장소: '+venue+'\n서울시 '+f'{published:%Y.%m.%d}'+' 공식 안내에서 확인했습니다. 운영시간·입장료·예약 여부·휴관일은 확정하지 않았습니다. 방문 전 미술관 공식 안내를 확인하세요.',
+       'image_subject':'Photorealistic editorial still life of an empty fictional contemporary media-art gallery with abstract luminous colored screens and simple sculptural volumes, quiet museum lighting, no real artworks, portraits, people, logos or writing. A conceptual scene, not the actual exhibition'}
+    c,r=finish(c,claims,sources,'seoul-labelled-exhibition-v1');c['valid_until']=min(moment(c['valid_until']),published+timedelta(days=7),end).isoformat()
+    c['caption']=c['caption'].replace('직접 사용·시식 후기','직접 방문 후기').replace('실제 제품·발색·단면','실제 행사 현장·작품')
+    r['scope']='서울시 전시 개최 문장과 AI 요약 밖 기간·요일·장소 라벨 대조'
+    return c,r
+
+
 def make_release(root,key,at=None):
     at=at or datetime.now(timezone.utc)
     try:
@@ -168,6 +192,8 @@ def make_release(root,key,at=None):
         if performance:return performance
         event=labelled_culture_event(sources,key,title,published,source['text'],at)
         if event:return event
+        exhibition=labelled_exhibition(sources,key,title,published,source['text'],at)
+        if exhibition:return exhibition
         if not re.fullmatch(r'20\d{2}서울로미디어캔버스.+전시',normalize(title)):
             raise EvidenceError('이 서울시 전시 형식의 검증 규칙이 필요합니다.')
         period=re.search(r'전시기간:(20\d{2})년(\d{1,2})월(\d{1,2})일~(20\d{2})년(\d{1,2})월(\d{1,2})일',text)
